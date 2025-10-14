@@ -499,6 +499,42 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Request Another Ride Button
+document.addEventListener('DOMContentLoaded', function() {
+    const requestAnotherRideBtn = document.getElementById('requestAnotherRideBtn');
+    const successMessage = document.getElementById('successMessage');
+    const regularForm = document.getElementById('rideRequestForm');
+    const hourlyForm = document.getElementById('hourlyRideForm');
+    const regularRideBtn = document.getElementById('regularRideBtn');
+    const hourlyRideBtn = document.getElementById('hourlyRideBtn');
+    
+    if (requestAnotherRideBtn) {
+        requestAnotherRideBtn.addEventListener('click', function() {
+            // Hide success message
+            successMessage.classList.add('hidden');
+            
+            // Reset both forms
+            regularForm.reset();
+            hourlyForm.reset();
+            
+            // Show regular ride form by default
+            regularRideBtn.classList.add('active');
+            hourlyRideBtn.classList.remove('active');
+            regularForm.classList.remove('hidden');
+            hourlyForm.classList.add('hidden');
+            
+            // Reset hourly price display
+            const hourlyTotal = document.getElementById('hourlyTotal');
+            const priceBreakdown = document.getElementById('priceBreakdown');
+            if (hourlyTotal) hourlyTotal.textContent = '$0';
+            if (priceBreakdown) priceBreakdown.textContent = '';
+            
+            // Scroll to top of form
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+});
+
 // Log app initialization
 console.log('🚕 Ride Request App with Hourly Service initialized');
 console.log('Ready to accept ride requests and hourly driver services!');
