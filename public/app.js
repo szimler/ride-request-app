@@ -258,7 +258,7 @@ if ('ontouchstart' in window) {
 // Add to Contacts functionality
 function addToContacts() {
     const contactData = {
-        name: "Sebastian Zimler - Ride Service",
+        name: "Sebastian - Ride Service",
         phone: "+17142046318",
         website: "https://ride-request-app.onrender.com/",
         note: "Ride Service - Text only while driving"
@@ -297,7 +297,209 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Service Selection Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const regularRideBtn = document.getElementById('regularRideBtn');
+    const hourlyRideBtn = document.getElementById('hourlyRideBtn');
+    const regularForm = document.getElementById('rideRequestForm');
+    const hourlyForm = document.getElementById('hourlyRideForm');
+    
+    if (regularRideBtn && hourlyRideBtn && regularForm && hourlyForm) {
+        // Regular ride button click
+        regularRideBtn.addEventListener('click', function() {
+            regularRideBtn.classList.add('active');
+            hourlyRideBtn.classList.remove('active');
+            regularForm.classList.remove('hidden');
+            hourlyForm.classList.add('hidden');
+        });
+        
+        // Hourly ride button click
+        hourlyRideBtn.addEventListener('click', function() {
+            hourlyRideBtn.classList.add('active');
+            regularRideBtn.classList.remove('active');
+            hourlyForm.classList.remove('hidden');
+            regularForm.classList.add('hidden');
+        });
+    }
+});
+
+// Hourly Pricing Logic
+function calculateHourlyPrice(hours, startTime) {
+    const rates = {
+        'morning': 70,    // 7 AM - 10 AM
+        'standard': 50,   // 10 AM - 5 PM  
+        'evening': 70     // 5 PM - 9 PM
+    };
+    
+    if (!hours || !startTime) return 0;
+    
+    const startHour = parseInt(startTime.split(':')[0]);
+    let rate = rates.standard; // Default to standard rate
+    
+    if (startHour >= 7 && startHour < 10) {
+        rate = rates.morning;
+    } else if (startHour >= 10 && startHour < 17) {
+        rate = rates.standard;
+    } else if (startHour >= 17 && startHour < 21) {
+        rate = rates.evening;
+    }
+    
+    return parseInt(hours) * rate;
+}
+
+function updateHourlyPrice() {
+    const hoursSelect = document.getElementById('hours_needed');
+    const startTimeInput = document.getElementById('hourly_start_time');
+    const totalDisplay = document.getElementById('hourlyTotal');
+    const breakdownDisplay = document.getElementById('priceBreakdown');
+    
+    if (!hoursSelect || !startTimeInput || !totalDisplay || !breakdownDisplay) return;
+    
+    const hours = hoursSelect.value;
+    const startTime = startTimeInput.value;
+    
+    if (hours && startTime) {
+        const total = calculateHourlyPrice(hours, startTime);
+        const rate = total / parseInt(hours);
+        
+        totalDisplay.textContent = `$${total}`;
+        
+        let timeRange = '';
+        const startHour = parseInt(startTime.split(':')[0]);
+        
+        if (startHour >= 7 && startHour < 10) {
+            timeRange = 'Morning Rate (7 AM - 10 AM)';
+        } else if (startHour >= 10 && startHour < 17) {
+            timeRange = 'Standard Rate (10 AM - 5 PM)';
+        } else if (startHour >= 17 && startHour < 21) {
+            timeRange = 'Evening Rate (5 PM - 9 PM)';
+        } else {
+            timeRange = 'Contact for pricing outside standard hours';
+        }
+        
+        breakdownDisplay.textContent = `${hours} hours × $${rate}/hour (${timeRange})`;
+    } else {
+        totalDisplay.textContent = '$0';
+        breakdownDisplay.textContent = '';
+    }
+}
+
+// Add event listeners for hourly pricing
+document.addEventListener('DOMContentLoaded', function() {
+    const hoursSelect = document.getElementById('hours_needed');
+    const startTimeInput = document.getElementById('hourly_start_time');
+    
+    if (hoursSelect) {
+        hoursSelect.addEventListener('change', updateHourlyPrice);
+    }
+    
+    if (startTimeInput) {
+        startTimeInput.addEventListener('change', updateHourlyPrice);
+    }
+});
+
+// Hourly Form Submission
+document.addEventListener('DOMContentLoaded', function() {
+    const hourlyForm = document.getElementById('hourlyRideForm');
+    
+    if (hourlyForm) {
+        hourlyForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('hourlySubmitBtn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnLoading = submitBtn.querySelector('.btn-loading');
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            btnText.classList.add('hidden');
+            btnLoading.classList.remove('hidden');
+            
+            // Get form data
+            const hours = document.getElementById('hours_needed').value;
+            const startTime = document.getElementById('hourly_start_time').value;
+            const totalPrice = calculateHourlyPrice(hours, startTime);
+            
+            const formData = {
+                name: document.getElementById('hourly_name').value.trim(),
+                phone_number: document.getElementById('hourly_phone_number').value.replace(/\D/g, ''),
+                pickup_location: document.getElementById('hourly_pickup_location').value.trim(),
+                hours_needed: hours,
+                start_time: startTime,
+                date: document.getElementById('hourly_date').value,
+                notes: document.getElementById('hourly_notes').value.trim(),
+                service_type: 'hourly',
+                estimated_total: totalPrice
+            };
+            
+            // Clean phone number
+            const rawPhone = formData.phone_number;
+            const cleanPhone = rawPhone.startsWith('1') ? `+${rawPhone}` : `+1${rawPhone}`;
+            formData.phone_number = cleanPhone;
+            
+            try {
+                // Submit the hourly ride request
+                const response = await fetch('/api/ride-request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Show success message
+                    const successMessage = document.getElementById('successMessage');
+                    successMessage.classList.remove('hidden');
+                    
+                    // Reset form
+                    hourlyForm.reset();
+                    
+                    // Scroll to success message
+                    successMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                } else {
+                    // Show error message
+                    const errorMessage = document.getElementById('errorMessage');
+                    const errorText = document.getElementById('errorText');
+                    errorText.textContent = result.message || 'Please try again or contact us directly.';
+                    errorMessage.classList.remove('hidden');
+                    errorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                
+            } catch (error) {
+                console.error('Error submitting hourly form:', error);
+                const errorMessage = document.getElementById('errorMessage');
+                const errorText = document.getElementById('errorText');
+                errorText.textContent = 'Network error. Please check your connection and try again.';
+                errorMessage.classList.remove('hidden');
+                errorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } finally {
+                // Reset button state
+                submitBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnLoading.classList.add('hidden');
+            }
+        });
+    }
+});
+
+// Set minimum date for hourly form
+document.addEventListener('DOMContentLoaded', function() {
+    const hourlyDateInput = document.getElementById('hourly_date');
+    if (hourlyDateInput && hourlyDateInput.type === 'date') {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        hourlyDateInput.min = `${year}-${month}-${day}`;
+        hourlyDateInput.value = `${year}-${month}-${day}`;
+    }
+});
+
 // Log app initialization
-console.log('🚕 Ride Request App initialized');
-console.log('Ready to accept ride requests!');
+console.log('🚕 Ride Request App with Hourly Service initialized');
+console.log('Ready to accept ride requests and hourly driver services!');
 
