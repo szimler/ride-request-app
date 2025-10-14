@@ -206,30 +206,56 @@ function displayRequests() {
             
             <div class="request-actions">
                 ${request.status === 'pending' ? `
-                    <button class="action-btn btn-confirm" onclick="sendQuote(${request.id})">
-                        💵 Send Quote
+                    <button class="action-btn btn-info" onclick="preQuoteDriver(${request.id})" title="SMS driver for YES/NO confirmation">
+                        📱 Pre-Quote (Driver)
                     </button>
-                    <button class="action-btn btn-cancel" onclick="updateStatus(${request.id}, 'not_available')">
-                        ✗ Not Available
+                    <button class="action-btn btn-confirm" onclick="showQuotePopup(${request.id})">
+                        💵 Send Quote to Rider
+                    </button>
+                    <button class="action-btn btn-cancel" onclick="notAvailableSMS(${request.id})">
+                        ✗ Not Available (SMS)
                     </button>
                 ` : ''}
                 ${request.status === 'quoted' ? `
-                    <button class="action-btn btn-confirm" onclick="updateStatus(${request.id}, 'confirmed')">
-                        ✓ Confirm Ride (Customer Accepted)
+                    <button class="action-btn btn-copy" onclick="copyQuote(${request.id})" title="Copy quote details to clipboard">
+                        📋 Copy Quote
+                    </button>
+                    <button class="action-btn btn-info" onclick="smsRiderQuote(${request.id})" title="Open SMS app with quote">
+                        💬 SMS Rider
+                    </button>
+                    <button class="action-btn btn-confirm" onclick="confirmAndSMSDriver(${request.id})">
+                        ✓ Confirm & SMS Driver
                     </button>
                     <button class="action-btn btn-cancel" onclick="updateStatus(${request.id}, 'declined')">
-                        ✗ Declined (Customer Rejected)
+                        ✗ Declined
+                    </button>
+                    <button class="action-btn btn-back" onclick="updateStatus(${request.id}, 'pending')">
+                        ← Back to Pending
                     </button>
                 ` : ''}
                 ${request.status === 'confirmed' ? `
+                    <button class="action-btn btn-info" onclick="smsDriverConfirmed(${request.id})" title="Resend confirmation to driver">
+                        📱 SMS Driver Again
+                    </button>
                     <button class="action-btn btn-complete" onclick="updateStatus(${request.id}, 'completed')">
                         ✓ Complete Ride
                     </button>
                     <button class="action-btn btn-cancel" onclick="updateStatus(${request.id}, 'cancelled')">
-                        Cancel
+                        ✗ Cancel
+                    </button>
+                    <button class="action-btn btn-back" onclick="updateStatus(${request.id}, 'quoted')">
+                        ← Back to Quoted
                     </button>
                 ` : ''}
-                ${request.status === 'completed' || request.status === 'cancelled' || request.status === 'not_available' || request.status === 'declined' ? `
+                ${request.status === 'completed' ? `
+                    <button class="action-btn btn-back" onclick="updateStatus(${request.id}, 'confirmed')">
+                        ← Back to Confirmed
+                    </button>
+                    <button class="action-btn btn-confirm" onclick="updateStatus(${request.id}, 'pending')" style="background: #6B7280;">
+                        Reset to Pending
+                    </button>
+                ` : ''}
+                ${request.status === 'cancelled' || request.status === 'not_available' || request.status === 'declined' ? `
                     <button class="action-btn btn-confirm" onclick="updateStatus(${request.id}, 'pending')" style="background: #6B7280;">
                         Reset to Pending
                     </button>
@@ -517,5 +543,382 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-console.log('🚕 Admin Dashboard initialized');
+// ============================================
+// NEW WORKFLOW FUNCTIONS
+// ============================================
+
+let currentQuoteRequestId = null;
+
+// 1. PRE-QUOTE TO DRIVER
+function preQuoteDriver(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) {
+        showNotification('Request not found', 'error');
+        return;
+    }
+    
+    const driverPhone = '7142046318'; // Driver phone number
+    
+    // Format the message
+    const message = `🚕 PRE-QUOTE REQUEST
+
+Rider: ${request.name}
+Phone: ${request.phone_number}
+
+📍 Pickup: ${request.pickup_location}
+📍 Dropoff: ${request.dropoff_location}
+
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Time: ${formatTime(request.requested_time)}
+
+${request.distance_miles ? `📏 Distance: ${request.distance_miles.toFixed(1)} miles` : ''}
+${request.duration_minutes ? `⏱️ Estimated Time: ${Math.round(request.duration_minutes)} minutes` : ''}
+
+Please reply YES with your ETA or NO if unavailable`;
+
+    // Open SMS app
+    const smsLink = `sms:${driverPhone}?&body=${encodeURIComponent(message)}`;
+    window.open(smsLink, '_blank');
+    
+    showNotification('Pre-quote SMS opened for driver', 'success');
+}
+
+// 2. SHOW QUOTE POPUP
+async function showQuotePopup(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) {
+        showNotification('Request not found', 'error');
+        return;
+    }
+    
+    currentQuoteRequestId = requestId;
+    
+    // Calculate route if not already done
+    if (!request.distance_miles) {
+        showNotification('Calculating route...', 'info');
+        try {
+            const response = await fetch('/api/calculate-route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pickup: request.pickup_location,
+                    dropoff: request.dropoff_location
+                })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                request.distance_miles = result.distance_miles;
+                request.duration_minutes = result.duration_minutes;
+                request.suggested_price = result.suggested_price;
+            }
+        } catch (error) {
+            console.error('Error calculating route:', error);
+        }
+    }
+    
+    // Pre-fill the popup
+    document.getElementById('quotePrice').value = request.suggested_price || request.quote_price || '';
+    document.getElementById('quoteETA').value = request.pickup_eta_minutes || 15;
+    document.getElementById('quoteDuration').value = request.duration_minutes ? Math.round(request.duration_minutes) : '';
+    
+    // Show popup
+    document.getElementById('quotePopup').classList.remove('hidden');
+    
+    // Update preview on input
+    const updatePreview = () => {
+        const price = document.getElementById('quotePrice').value;
+        const eta = document.getElementById('quoteETA').value;
+        const duration = document.getElementById('quoteDuration').value;
+        
+        if (price && eta && duration) {
+            const previewText = `Hi ${request.name}!
+
+Your Ride Quote:
+
+📍 Pickup: ${request.pickup_location}
+📍 Dropoff: ${request.dropoff_location}
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Time: ${formatTime(request.requested_time)}
+
+💰 Price: $${parseFloat(price).toFixed(2)}
+🚗 Estimated Pickup: ${eta} minutes
+⏱️ Ride Duration: ${duration} minutes
+
+Do you accept the quote? Please reply YES or NO`;
+            
+            document.getElementById('quotePreviewText').textContent = previewText;
+        }
+    };
+    
+    document.getElementById('quotePrice').addEventListener('input', updatePreview);
+    document.getElementById('quoteETA').addEventListener('input', updatePreview);
+    document.getElementById('quoteDuration').addEventListener('input', updatePreview);
+    
+    updatePreview();
+}
+
+// 3. CLOSE QUOTE POPUP
+function closeQuotePopup() {
+    document.getElementById('quotePopup').classList.add('hidden');
+    currentQuoteRequestId = null;
+}
+
+// 4. SUBMIT QUOTE TO RIDER (SMS)
+async function submitQuoteToRider() {
+    if (!currentQuoteRequestId) return;
+    
+    const request = allRequests.find(r => r.id === currentQuoteRequestId);
+    if (!request) {
+        showNotification('Request not found', 'error');
+        return;
+    }
+    
+    const price = parseFloat(document.getElementById('quotePrice').value);
+    const eta = parseInt(document.getElementById('quoteETA').value);
+    const duration = parseInt(document.getElementById('quoteDuration').value);
+    
+    if (!price || !eta || !duration) {
+        showNotification('Please fill all fields', 'error');
+        return;
+    }
+    
+    // Update request in database
+    try {
+        const response = await fetch(`/api/ride-requests/${currentQuoteRequestId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                status: 'quoted',
+                quote_price: price,
+                pickup_eta_minutes: eta,
+                ride_duration_minutes: duration
+            })
+        });
+        
+        const result = await response.json();
+        if (!result.success) {
+            showNotification('Failed to update quote', 'error');
+            return;
+        }
+    } catch (error) {
+        console.error('Error updating quote:', error);
+        showNotification('Error updating quote', 'error');
+        return;
+    }
+    
+    // Format SMS message
+    const message = `Hi ${request.name}!
+
+Your Ride Quote:
+
+📍 Pickup: ${request.pickup_location}
+📍 Dropoff: ${request.dropoff_location}
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Time: ${formatTime(request.requested_time)}
+
+💰 Price: $${price.toFixed(2)}
+🚗 Estimated Pickup: ${eta} minutes
+⏱️ Ride Duration: ${duration} minutes
+
+Do you accept the quote? Please reply YES or NO`;
+    
+    // Open SMS app
+    const smsLink = `sms:${request.phone_number}?&body=${encodeURIComponent(message)}`;
+    window.open(smsLink, '_blank');
+    
+    closeQuotePopup();
+    showNotification('Quote sent! SMS app opened', 'success');
+    
+    // Reload requests to show updated status
+    setTimeout(loadRideRequests, 500);
+}
+
+// 5. COPY QUOTE
+function copyQuote(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) {
+        showNotification('Request not found', 'error');
+        return;
+    }
+    
+    const quoteText = `Hi ${request.name}!
+
+Your Ride Quote:
+
+📍 Pickup: ${request.pickup_location}
+📍 Dropoff: ${request.dropoff_location}
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Time: ${formatTime(request.requested_time)}
+
+💰 Price: $${parseFloat(request.quote_price).toFixed(2)}
+${request.pickup_eta_minutes ? `🚗 Estimated Pickup: ${request.pickup_eta_minutes} minutes` : ''}
+${request.ride_duration_minutes ? `⏱️ Ride Duration: ${request.ride_duration_minutes} minutes` : ''}
+
+Do you accept the quote? Please reply YES or NO`;
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(quoteText).then(() => {
+        showNotification('Quote copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        showNotification('Failed to copy quote', 'error');
+    });
+}
+
+// 6. SMS RIDER (with quote)
+function smsRiderQuote(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) {
+        showNotification('Request not found', 'error');
+        return;
+    }
+    
+    const message = `Hi ${request.name}!
+
+Your Ride Quote:
+
+📍 Pickup: ${request.pickup_location}
+📍 Dropoff: ${request.dropoff_location}
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Time: ${formatTime(request.requested_time)}
+
+💰 Price: $${parseFloat(request.quote_price).toFixed(2)}
+${request.pickup_eta_minutes ? `🚗 Estimated Pickup: ${request.pickup_eta_minutes} minutes` : ''}
+${request.ride_duration_minutes ? `⏱️ Ride Duration: ${request.ride_duration_minutes} minutes` : ''}
+
+Do you accept the quote? Please reply YES or NO`;
+    
+    const smsLink = `sms:${request.phone_number}?&body=${encodeURIComponent(message)}`;
+    window.open(smsLink, '_blank');
+    
+    showNotification('SMS app opened with quote', 'success');
+}
+
+// 7. CONFIRM AND SMS DRIVER
+async function confirmAndSMSDriver(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) {
+        showNotification('Request not found', 'error');
+        return;
+    }
+    
+    // Update status to confirmed
+    try {
+        const response = await fetch(`/api/ride-requests/${requestId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'confirmed' })
+        });
+        
+        const result = await response.json();
+        if (!result.success) {
+            showNotification('Failed to confirm ride', 'error');
+            return;
+        }
+    } catch (error) {
+        console.error('Error confirming ride:', error);
+        showNotification('Error confirming ride', 'error');
+        return;
+    }
+    
+    // SMS driver with confirmed details
+    const driverPhone = '7142046318';
+    const message = `✅ RIDE CONFIRMED
+
+Rider: ${request.name}
+Phone: ${request.phone_number}
+
+📍 Pickup: ${request.pickup_location}
+📍 Dropoff: ${request.dropoff_location}
+
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Time: ${formatTime(request.requested_time)}
+
+💰 Price: $${parseFloat(request.quote_price).toFixed(2)}
+${request.pickup_eta_minutes ? `🚗 Your ETA: ${request.pickup_eta_minutes} minutes` : ''}
+${request.ride_duration_minutes ? `⏱️ Duration: ${request.ride_duration_minutes} minutes` : ''}
+
+Customer has accepted the quote!`;
+    
+    const smsLink = `sms:${driverPhone}?&body=${encodeURIComponent(message)}`;
+    window.open(smsLink, '_blank');
+    
+    showNotification('Ride confirmed! SMS sent to driver', 'success');
+    
+    // Reload requests
+    setTimeout(loadRideRequests, 500);
+}
+
+// 8. SMS DRIVER (for already confirmed rides)
+function smsDriverConfirmed(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) {
+        showNotification('Request not found', 'error');
+        return;
+    }
+    
+    const driverPhone = '7142046318';
+    const message = `✅ RIDE REMINDER
+
+Rider: ${request.name}
+Phone: ${request.phone_number}
+
+📍 Pickup: ${request.pickup_location}
+📍 Dropoff: ${request.dropoff_location}
+
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Time: ${formatTime(request.requested_time)}
+
+💰 Price: $${parseFloat(request.quote_price).toFixed(2)}
+${request.pickup_eta_minutes ? `🚗 Your ETA: ${request.pickup_eta_minutes} minutes` : ''}
+${request.ride_duration_minutes ? `⏱️ Duration: ${request.ride_duration_minutes} minutes` : ''}`;
+    
+    const smsLink = `sms:${driverPhone}?&body=${encodeURIComponent(message)}`;
+    window.open(smsLink, '_blank');
+    
+    showNotification('SMS sent to driver', 'success');
+}
+
+// 9. NOT AVAILABLE SMS
+async function notAvailableSMS(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) {
+        showNotification('Request not found', 'error');
+        return;
+    }
+    
+    // Format apology message
+    const message = `Hi ${request.name},
+
+Thank you for your ride request. Unfortunately, Sebastian is currently unavailable to fulfill your request for ${formatDate(request.requested_date)} at ${formatTime(request.requested_time)}.
+
+We apologize for any inconvenience. Sebastian hopes to be available for your future ride requests.
+
+For immediate needs, please feel free to contact us at (714) 204-6318.
+
+Thank you for your understanding!`;
+    
+    // Open SMS app
+    const smsLink = `sms:${request.phone_number}?&body=${encodeURIComponent(message)}`;
+    window.open(smsLink, '_blank');
+    
+    showNotification('Apology SMS opened', 'success');
+    
+    // Update status to not_available after a short delay
+    setTimeout(async () => {
+        try {
+            await fetch(`/api/ride-requests/${requestId}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'not_available' })
+            });
+            loadRideRequests();
+        } catch (error) {
+            console.error('Error updating status:', error);
+        }
+    }, 500);
+}
+
+console.log('🚕 Admin Dashboard initialized with full workflow');
 
