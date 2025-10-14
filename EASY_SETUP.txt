@@ -1,0 +1,103 @@
+═══════════════════════════════════════════════════════════
+  🚕 SUPER EASY SETUP - CHANGE PASSWORD & SETTINGS
+═══════════════════════════════════════════════════════════
+
+QUICK SETUP (Recommended):
+---------------------------
+
+Just run ONE command:
+
+    npm run setup
+
+This interactive wizard will guide you through:
+✓ Changing admin username
+✓ Changing admin password  
+✓ Setting up Twilio SMS (optional)
+✓ Setting up Google Maps (optional)
+✓ Changing server port (optional)
+
+It will create/update config.js automatically!
+
+═══════════════════════════════════════════════════════════
+
+ALTERNATIVE: Manual Setup
+--------------------------
+
+1. Copy the example config:
+   copy config.example.js config.js
+
+2. Open config.js in any text editor
+
+3. Change these lines:
+   ADMIN_USERNAME: 'admin',      ← Your username
+   ADMIN_PASSWORD: 'admin123'    ← Your password
+
+4. Save and close
+
+═══════════════════════════════════════════════════════════
+
+CHANGING PASSWORD LATER:
+------------------------
+
+Option 1 - Run setup again (easiest):
+   npm run setup
+
+Option 2 - Edit config.js manually:
+   Open config.js → Change ADMIN_PASSWORD → Save
+
+═══════════════════════════════════════════════════════════
+
+SECURITY TIPS:
+--------------
+
+✓ Use a strong password (at least 8 characters)
+✓ Mix letters, numbers, and symbols
+✓ Don't share your password
+✓ Change default password before going live!
+
+Good passwords:
+  MyRides2025!
+  SecureRide#2024
+  TaxiAdmin$99
+
+Bad passwords:
+  password
+  123456
+  admin
+
+═══════════════════════════════════════════════════════════
+
+AFTER CHANGING PASSWORD:
+------------------------
+
+1. Restart the server:
+   Stop current server (Ctrl+C)
+   npm start
+
+2. Login with new credentials:
+   Go to: http://localhost:3000/admin
+   Use your new username/password
+
+═══════════════════════════════════════════════════════════
+
+FORGOT PASSWORD?
+----------------
+
+No worries! Just run:
+   npm run setup
+
+And set a new password. It will update config.js.
+
+═══════════════════════════════════════════════════════════
+
+MULTIPLE ADMIN USERS?
+---------------------
+
+Currently supports one admin account.
+
+To add multiple users in the future:
+- Let me know and I can add a user management system!
+
+═══════════════════════════════════════════════════════════
+
+

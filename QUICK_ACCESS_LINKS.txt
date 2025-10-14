@@ -1,0 +1,125 @@
+╔══════════════════════════════════════════════════════════════╗
+║         RIDES CEL - DIGITAL BUSINESS CARD                    ║
+║              Quick Access Links                              ║
+╚══════════════════════════════════════════════════════════════╝
+
+📱 YOUR DIGITAL BUSINESS CARD
+   → http://localhost:3000/card
+   
+   Share this link with customers so they can:
+   ✓ Scan QR code to save your contact
+   ✓ Download your contact (VCF file)
+   ✓ Request a ride instantly
+   ✓ Call you with one tap
+   ✓ Share your card with others
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🖨️ PRINT QR CODE FOR MARKETING
+   → http://localhost:3000/print-qr
+   
+   Use this to:
+   ✓ Print QR codes for business cards
+   ✓ Create flyers and posters
+   ✓ Make vehicle stickers
+   ✓ Download high-quality QR image
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📥 DIRECT CONTACT DOWNLOAD
+   → http://localhost:3000/api/vcard
+   
+   Direct link to download VCF contact file
+   (Used by QR code automatically)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚕 OTHER IMPORTANT LINKS
+   → http://localhost:3000/          (Ride Request Form)
+   → http://localhost:3000/admin     (Admin Dashboard)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📲 HOW TO SHARE YOUR CARD
+
+Via Text Message:
+   "Hey! Book a ride anytime. Save my contact: 
+    http://localhost:3000/card"
+
+Via Social Media:
+   "🚕 Need a reliable ride? Save my contact with one tap!
+    👉 http://localhost:3000/card
+    Available 24/7 • (714) 204-6318"
+
+Via Email Signature:
+   "Rides CEL | Professional Ride Service
+    📱 Save Contact: http://localhost:3000/card
+    ☎️ (714) 204-6318"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 QUICK ACTIONS
+
+1. TEST YOUR CARD:
+   Open http://localhost:3000/card in your browser
+
+2. SCAN WITH YOUR PHONE:
+   Use your phone camera to scan the QR code on the card
+
+3. PRINT QR CODES:
+   Go to http://localhost:3000/print-qr and click "Print"
+
+4. SHARE ON SOCIAL MEDIA:
+   Copy the card link and post on Instagram/Facebook
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 WHAT HAPPENS WHEN CUSTOMERS SCAN THE QR CODE:
+
+1. They point their phone camera at the QR code
+2. A notification appears on their screen
+3. They tap the notification
+4. Your business card opens in their browser
+5. They can:
+   • Save your contact to their phone
+   • Request a ride immediately
+   • Call you with one tap
+   • Share your card with others
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 PRO TIPS
+
+✓ Print QR codes at 1.5" x 1.5" minimum size
+✓ Use bit.ly to shorten your card link (easier to share)
+✓ Add the card link to your Instagram/Facebook bio
+✓ Include QR code on the back of physical business cards
+✓ Display QR code in your vehicle for current passengers
+✓ Test QR codes before mass printing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📞 CURRENT CONTACT INFO
+   Business: Rides CEL
+   Phone: (714) 204-6318
+   Service: Professional Ride Service
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌍 WHEN YOU GO LIVE
+
+Replace "localhost:3000" with your actual domain:
+   http://localhost:3000/card → https://yoursite.com/card
+
+Then update:
+   ✓ QR codes (print new ones)
+   ✓ Social media links
+   ✓ Email signatures
+   ✓ Marketing materials
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ EVERYTHING IS READY! Start sharing: http://localhost:3000/card
+
+╚══════════════════════════════════════════════════════════════╝
+

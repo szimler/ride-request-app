@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Request a Ride</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCIMXA0Sfa7y1T_HU0HKDUfZRrQLseJZC4&libraries=places&callback=initAutocomplete" async defer></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3 3 0 0 0 2 12v4c0 .6.4 1 1 1h2"></path>
+                    <circle cx="7" cy="17" r="2"></circle>
+                    <circle cx="17" cy="17" r="2"></circle>
+                    <path d="M9 12h6"></path>
+                </svg>
+                <h1>Request a Ride with Sebastian</h1>
+            </div>
+            <p class="subtitle">Your trusted local driver in Jacksonville & Northeast Florida</p>
+        </header>
+
+        <!-- Personal Introduction -->
+        <div class="driver-intro">
+            <div class="driver-photo">
+                <img src="steve-photo.jpg" alt="Sebastian Zimler - Your Trusted Driver" class="profile-img">
+            </div>
+            <div class="driver-message">
+                <h2>Hi, I'm Sebastian Zimler - Your Driver!</h2>
+                <p>Looking for a <strong>safe, smooth and genuinely comfortable</strong> ride? Give me a try before booking somewhere else!</p>
+                <p>As a <strong>local driver</strong>, I take pride in providing:</p>
+                <ul>
+                    <li>✓ Competitive quotes you can trust</li>
+                    <li>✓ Personal, professional service</li>
+                    <li>✓ Safe and comfortable rides</li>
+                    <li>✓ Knowledge of Jacksonville & NE Florida</li>
+                </ul>
+                <p class="intro-cta">Send me your trip details below and I'll get back to you ASAP with a quote. <strong>You'll know exactly what to expect</strong> - no surprises, just honest service from a local driver you can trust!</p>
+            </div>
+        </div>
+
+        <!-- Contact Info Section -->
+        <div class="contact-section">
+            <div class="contact-info">
+                <h3>📱 Contact Sebastian</h3>
+                <p><strong>Phone:</strong> <a href="tel:+17142046318">+1 (714) 204-6318</a></p>
+                <p><strong>Website:</strong> <a href="https://ride-request-app.onrender.com/" target="_blank">ride-request-app.onrender.com</a></p>
+                <p><strong>Text Only While Driving:</strong> I only receive TEXT messages while driving for safety.</p>
+                <button id="addContactBtn" class="contact-btn">
+                    📞 Add to Contacts
+                </button>
+            </div>
+        </div>
+
+        <!-- Success Message (hidden by default) -->
+        <div id="successMessage" class="message success-message hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <div>
+                <h3>Request Submitted Successfully!</h3>
+                <p>You'll receive a confirmation message shortly. We'll contact you ASAP to confirm your ride details.</p>
+            </div>
+        </div>
+
+        <!-- Error Message (hidden by default) -->
+        <div id="errorMessage" class="message error-message hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+            </svg>
+            <div>
+                <h3>Oops! Something went wrong</h3>
+                <p id="errorText">Please try again or contact us directly.</p>
+            </div>
+        </div>
+
+        <!-- Ride Request Form -->
+        <form id="rideRequestForm" class="ride-form">
+            <!-- Personal Information -->
+            <div class="form-section">
+                <h2 class="section-title">Personal Information</h2>
+                
+                <div class="form-group">
+                    <label for="name">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        Full Name
+                    </label>
+                    <input 
+                        type="text" 
+                        id="name" 
+                        name="name" 
+                        placeholder="Enter your full name" 
+                        required
+                        autocomplete="name"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="phone_number">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                        Phone Number
+                    </label>
+                    <input 
+                        type="tel" 
+                        id="phone_number" 
+                        name="phone_number" 
+                        placeholder="714-204-6318 or +1 714 204 6318" 
+                        required
+                        autocomplete="tel"
+                    >
+                    <small class="field-hint">Enter in any format - we'll handle it!</small>
+                </div>
+            </div>
+
+            <!-- Trip Details -->
+            <div class="form-section">
+                <h2 class="section-title">Trip Details</h2>
+                
+                <div class="form-group">
+                    <label for="pickup_location">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="10" r="3"></circle>
+                            <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 6.9 8 11.7z"></path>
+                        </svg>
+                        Pickup Location
+                    </label>
+                    <input 
+                        type="text" 
+                        id="pickup_location" 
+                        name="pickup_location" 
+                        placeholder="Start typing address... (e.g., 123 Main St, Jacksonville)" 
+                        required
+                        autocomplete="off"
+                    >
+                    <small class="field-hint">Start typing and select from suggestions</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="pickup_apt">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                        Apt/Suite/Unit # (Optional)
+                    </label>
+                    <input 
+                        type="text" 
+                        id="pickup_apt" 
+                        name="pickup_apt" 
+                        placeholder="e.g., Apt 205, Suite B, Unit 3" 
+                        autocomplete="off"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="dropoff_location">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+                        </svg>
+                        Drop-off Location
+                    </label>
+                    <input 
+                        type="text" 
+                        id="dropoff_location" 
+                        name="dropoff_location" 
+                        placeholder="Start typing address... (e.g., JAX Airport, Jacksonville Beach)" 
+                        required
+                        autocomplete="off"
+                    >
+                    <small class="field-hint">Start typing and select from suggestions</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="dropoff_apt">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                        Apt/Suite/Unit # (Optional)
+                    </label>
+                    <input 
+                        type="text" 
+                        id="dropoff_apt" 
+                        name="dropoff_apt" 
+                        placeholder="e.g., Apt 205, Suite B, Unit 3" 
+                        autocomplete="off"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="requested_date">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        When do you need the ride?
+                    </label>
+                    <select 
+                        id="requested_date" 
+                        name="requested_date" 
+                        required
+                    >
+                        <option value="">Select a date</option>
+                        <option value="today">Today</option>
+                        <option value="tomorrow">Tomorrow</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="requested_time">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        What time?
+                    </label>
+                    <select 
+                        id="requested_time" 
+                        name="requested_time" 
+                        required
+                    >
+                        <option value="">Select a time</option>
+                        <option value="asap">ASAP (As soon as possible)</option>
+                        <option value="15min">In 15 minutes</option>
+                        <option value="30min">In 30 minutes</option>
+                        <option value="1hour">In 1 hour</option>
+                        <optgroup label="Morning">
+                            <option value="06:00">6:00 AM</option>
+                            <option value="06:30">6:30 AM</option>
+                            <option value="07:00">7:00 AM</option>
+                            <option value="07:30">7:30 AM</option>
+                            <option value="08:00">8:00 AM</option>
+                            <option value="08:30">8:30 AM</option>
+                            <option value="09:00">9:00 AM</option>
+                            <option value="09:30">9:30 AM</option>
+                            <option value="10:00">10:00 AM</option>
+                            <option value="10:30">10:30 AM</option>
+                            <option value="11:00">11:00 AM</option>
+                            <option value="11:30">11:30 AM</option>
+                        </optgroup>
+                        <optgroup label="Afternoon">
+                            <option value="12:00">12:00 PM (Noon)</option>
+                            <option value="12:30">12:30 PM</option>
+                            <option value="13:00">1:00 PM</option>
+                            <option value="13:30">1:30 PM</option>
+                            <option value="14:00">2:00 PM</option>
+                            <option value="14:30">2:30 PM</option>
+                            <option value="15:00">3:00 PM</option>
+                            <option value="15:30">3:30 PM</option>
+                            <option value="16:00">4:00 PM</option>
+                            <option value="16:30">4:30 PM</option>
+                            <option value="17:00">5:00 PM</option>
+                            <option value="17:30">5:30 PM</option>
+                        </optgroup>
+                        <optgroup label="Evening">
+                            <option value="18:00">6:00 PM</option>
+                            <option value="18:30">6:30 PM</option>
+                            <option value="19:00">7:00 PM</option>
+                            <option value="19:30">7:30 PM</option>
+                            <option value="20:00">8:00 PM</option>
+                            <option value="20:30">8:30 PM</option>
+                            <option value="21:00">9:00 PM</option>
+                            <option value="21:30">9:30 PM</option>
+                            <option value="22:00">10:00 PM</option>
+                            <option value="22:30">10:30 PM</option>
+                            <option value="23:00">11:00 PM</option>
+                            <option value="23:30">11:30 PM</option>
+                        </optgroup>
+                        <optgroup label="Late Night">
+                            <option value="00:00">12:00 AM (Midnight)</option>
+                            <option value="00:30">12:30 AM</option>
+                            <option value="01:00">1:00 AM</option>
+                            <option value="01:30">1:30 AM</option>
+                            <option value="02:00">2:00 AM</option>
+                            <option value="02:30">2:30 AM</option>
+                            <option value="03:00">3:00 AM</option>
+                            <option value="03:30">3:30 AM</option>
+                            <option value="04:00">4:00 AM</option>
+                            <option value="04:30">4:30 AM</option>
+                            <option value="05:00">5:00 AM</option>
+                            <option value="05:30">5:30 AM</option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="submit-btn" id="submitBtn">
+                <span class="btn-text">Request Ride</span>
+                <span class="btn-loading hidden">
+                    <svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Submitting...
+                </span>
+            </button>
+        </form>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p><strong>Sebastian Zimler</strong> - Your Local Driver</p>
+            <p>Serving Jacksonville & Northeast Florida</p>
+            <p class="footer-tagline">Trust Local. Ride Safe. Experience the Difference.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print QR Code - Rides CEL</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            padding: 40px;
+            background: #f7f7f7;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #1a202c;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 40px;
+        }
+
+        .qr-container {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .qr-box {
+            display: inline-block;
+            padding: 30px;
+            background: white;
+            border: 3px solid #667eea;
+            border-radius: 20px;
+            margin-bottom: 20px;
+        }
+
+        .qr-box img {
+            display: block;
+            width: 400px;
+            height: 400px;
+        }
+
+        .qr-label {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .qr-instruction {
+            font-size: 18px;
+            color: #4a5568;
+            margin-bottom: 5px;
+        }
+
+        .contact-info {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .contact-info h2 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 28px;
+        }
+
+        .phone {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .website {
+            font-size: 20px;
+            color: #4a5568;
+        }
+
+        .print-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-print {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-print:hover {
+            background: #5568d3;
+        }
+
+        .btn-download {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: #38a169;
+        }
+
+        .btn-back {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-back:hover {
+            background: #cbd5e0;
+        }
+
+        .tips {
+            background: #edf2f7;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .tips h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .tips ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .tips li {
+            color: #4a5568;
+            margin-bottom: 10px;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .tips li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #48bb78;
+            font-weight: 700;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                border-radius: 0;
+                padding: 20px;
+            }
+
+            .print-buttons,
+            .tips,
+            .subtitle {
+                display: none;
+            }
+
+            .qr-box {
+                border: 2px solid #000;
+            }
+
+            .qr-box img {
+                width: 500px;
+                height: 500px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .qr-box img {
+                width: 280px;
+                height: 280px;
+            }
+
+            .print-buttons {
+                flex-direction: column;
+            }
+
+            .phone {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Rides CEL - QR Code</h1>
+        <p class="subtitle">Print this page for business cards, flyers, and promotional materials</p>
+
+        <div class="qr-container">
+            <div class="qr-label">Scan to Save Contact & Book Rides</div>
+            <div class="qr-box">
+                <img id="qrCode" src="" alt="QR Code">
+            </div>
+            <div class="qr-instruction">Point your camera at the QR code</div>
+            <div class="qr-instruction" style="font-size: 16px; color: #718096;">No app needed - works with any smartphone</div>
+        </div>
+
+        <div class="contact-info">
+            <h2>Rides CEL</h2>
+            <div class="phone">(714) 204-6318</div>
+            <div class="website" id="websiteUrl">Loading...</div>
+        </div>
+
+        <div class="print-buttons">
+            <button class="btn btn-print" onclick="window.print()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Print This Page
+            </button>
+            <button class="btn btn-download" id="downloadQR">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download QR Code
+            </button>
+            <a href="/card" class="btn btn-back">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Card
+            </a>
+        </div>
+
+        <div class="tips">
+            <h3>📋 Printing Tips</h3>
+            <ul>
+                <li>Print in <strong>high quality</strong> (300 DPI or higher)</li>
+                <li>Use <strong>white paper</strong> for best contrast</li>
+                <li>Test the QR code <strong>before mass printing</strong></li>
+                <li>Keep at least <strong>0.5 inch margin</strong> around QR code</li>
+                <li>Don't resize too small - minimum 1.5" x 1.5"</li>
+                <li>Avoid glossy paper that might create glare</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const currentUrl = window.location.origin;
+        const cardUrl = `${currentUrl}/card`;
+        
+        // Display website URL
+        document.getElementById('websiteUrl').textContent = currentUrl;
+
+        // Generate QR code pointing to the business card page
+        function generateQRCode() {
+            const qrCodeImg = document.getElementById('qrCode');
+            const size = 400;
+            
+            // QR code points to the business card URL
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(cardUrl)}&format=png`;
+            
+            qrCodeImg.src = qrUrl;
+        }
+
+        // Download QR code
+        document.getElementById('downloadQR').addEventListener('click', () => {
+            const qrCodeImg = document.getElementById('qrCode');
+            const link = document.createElement('a');
+            link.download = 'RidesCEL-QRCode.png';
+            link.href = qrCodeImg.src;
+            link.click();
+        });
+
+        // Initialize
+        generateQRCode();
+    </script>
+</body>
+</html>
+

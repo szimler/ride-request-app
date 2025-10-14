@@ -1,0 +1,312 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.card-container {
+    width: 100%;
+    max-width: 450px;
+    position: relative;
+}
+
+.business-card {
+    background: white;
+    border-radius: 24px;
+    padding: 40px 30px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    text-align: center;
+}
+
+/* Logo */
+.card-logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-logo svg {
+    width: 45px;
+    height: 45px;
+    color: white;
+}
+
+/* Business Info */
+.business-name {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 8px;
+}
+
+.tagline {
+    font-size: 16px;
+    color: #718096;
+    margin-bottom: 30px;
+}
+
+/* Contact Info */
+.contact-info {
+    margin-bottom: 35px;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #4a5568;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.contact-item svg {
+    width: 20px;
+    height: 20px;
+    color: #667eea;
+}
+
+/* QR Code Section */
+.qr-section {
+    margin-bottom: 35px;
+}
+
+.qr-section h2 {
+    font-size: 18px;
+    color: #2d3748;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.qr-code-wrapper {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    display: inline-block;
+    border: 2px solid #e2e8f0;
+}
+
+.qr-code-wrapper img {
+    width: 200px;
+    height: 200px;
+    display: block;
+}
+
+.qr-hint {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #718096;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 30px;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: #48bb78;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #38a169;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(72, 187, 120, 0.4);
+}
+
+.btn-outline {
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-outline:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Share Section */
+.share-section {
+    padding-top: 25px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.share-text {
+    font-size: 14px;
+    color: #718096;
+    margin-bottom: 12px;
+}
+
+.share-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.share-btn,
+.copy-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid #cbd5e0;
+    background: #f7fafc;
+    color: #4a5568;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.share-btn:hover,
+.copy-btn:hover {
+    background: #edf2f7;
+    border-color: #a0aec0;
+}
+
+.share-btn svg,
+.copy-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.print-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 15px;
+    padding: 10px;
+    color: #667eea;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border-radius: 8px;
+}
+
+.print-link:hover {
+    background: #f7fafc;
+    color: #5568d3;
+}
+
+.print-link svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Copy Confirmation */
+.copy-confirmation {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #48bb78;
+    color: white;
+    padding: 16px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(72, 187, 120, 0.4);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.copy-confirmation.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(20px);
+}
+
+.copy-confirmation.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .business-card {
+        padding: 30px 20px;
+    }
+
+    .business-name {
+        font-size: 28px;
+    }
+
+    .qr-code-wrapper img {
+        width: 180px;
+        height: 180px;
+    }
+
+    .btn {
+        font-size: 15px;
+        padding: 14px 20px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    body {
+        background: white;
+    }
+
+    .business-card {
+        box-shadow: none;
+        border: 2px solid #e2e8f0;
+    }
+
+    .share-section {
+        display: none;
+    }
+}
+
