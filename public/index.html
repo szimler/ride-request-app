@@ -22,22 +22,24 @@
                 </svg>
                 <h1>Request a Ride with Sebastian</h1>
             </div>
-            <p class="subtitle">Your trusted local driver in Jacksonville & Northeast Florida</p>
+            <p class="subtitle">Your trusted local driver for trips over 15 miles • JAX & Orlando Airport service • Driver by the Hour</p>
         </header>
 
         <!-- Personal Introduction -->
         <div class="driver-intro">
             <div class="driver-photo">
-                <img src="steve-photo.jpg" alt="Sebastian Zimler - Your Trusted Driver" class="profile-img">
+                <img src="steve-photo.jpg" alt="Sebastian - Your Trusted Driver" class="profile-img">
             </div>
             <div class="driver-message">
-                <h2>Hi, I'm Sebastian Zimler - Your Driver!</h2>
+                <h2>Hi, I'm Sebastian - Your Driver!</h2>
+                <p><strong>Service Details:</strong> I specialize in trips <strong>over 15 miles</strong>, provide pickup & drop-off services at <strong>JAX and Orlando Airports</strong>, and offer <strong>Driver by the Hour</strong> services.</p>
                 <p>Looking for a <strong>safe, smooth and genuinely comfortable</strong> ride? Give me a try before booking somewhere else!</p>
                 <p>As a <strong>local driver</strong>, I take pride in providing:</p>
                 <ul>
                     <li>✓ Competitive quotes you can trust</li>
                     <li>✓ Personal, professional service</li>
-                    <li>✓ Safe and comfortable rides</li>
+                    <li>✓ Safe, clean and comfortable rides</li>
+                    <li>✓ Driver by the Hour services available</li>
                     <li>✓ Knowledge of Jacksonville & NE Florida</li>
                 </ul>
                 <p class="intro-cta">Send me your trip details below and I'll get back to you ASAP with a quote. <strong>You'll know exactly what to expect</strong> - no surprises, just honest service from a local driver you can trust!</p>
@@ -82,7 +84,19 @@
             </div>
         </div>
 
-        <!-- Ride Request Form -->
+        <!-- Service Selection -->
+        <div class="service-selection">
+            <div class="service-buttons">
+                <button type="button" id="regularRideBtn" class="service-btn active">
+                    🚗 Regular Ride
+                </button>
+                <button type="button" id="hourlyRideBtn" class="service-btn">
+                    ⏰ Driver by the Hour
+                </button>
+            </div>
+        </div>
+
+        <!-- Regular Ride Request Form -->
         <form id="rideRequestForm" class="ride-form">
             <!-- Personal Information -->
             <div class="form-section">
@@ -312,9 +326,195 @@
             </button>
         </form>
 
+        <!-- Hourly Ride Request Form (Hidden by default) -->
+        <form id="hourlyRideForm" class="ride-form hidden">
+            <div class="hourly-form-header">
+                <h2 class="section-title">⏰ Driver by the Hour Request</h2>
+                <div class="pricing-info">
+                    <h3>Hourly Rates:</h3>
+                    <div class="pricing-grid">
+                        <div class="pricing-item">
+                            <span class="time-range">10 AM - 5 PM</span>
+                            <span class="price">$50/hour</span>
+                        </div>
+                        <div class="pricing-item">
+                            <span class="time-range">7 AM - 10 AM</span>
+                            <span class="price">$70/hour</span>
+                        </div>
+                        <div class="pricing-item">
+                            <span class="time-range">5 PM - 9 PM</span>
+                            <span class="price">$70/hour</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Information -->
+            <div class="form-section">
+                <h2 class="section-title">Personal Information</h2>
+                
+                <div class="form-group">
+                    <label for="hourly_name">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        Full Name
+                    </label>
+                    <input 
+                        type="text" 
+                        id="hourly_name" 
+                        name="hourly_name" 
+                        placeholder="Enter your full name" 
+                        required
+                        autocomplete="name"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="hourly_phone_number">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                        Phone Number
+                    </label>
+                    <input 
+                        type="tel" 
+                        id="hourly_phone_number" 
+                        name="hourly_phone_number" 
+                        placeholder="714-204-6318 or +1 714 204 6318" 
+                        required
+                        autocomplete="tel"
+                    >
+                    <small class="field-hint">Enter in any format - we'll handle it!</small>
+                </div>
+            </div>
+
+            <!-- Hourly Service Details -->
+            <div class="form-section">
+                <h2 class="section-title">Hourly Service Details</h2>
+                
+                <div class="form-group">
+                    <label for="hourly_pickup_location">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="10" r="3"></circle>
+                            <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 6.9 8 11.7z"></path>
+                        </svg>
+                        Pickup Location
+                    </label>
+                    <input 
+                        type="text" 
+                        id="hourly_pickup_location" 
+                        name="hourly_pickup_location" 
+                        placeholder="Start typing address... (e.g., 123 Main St, Jacksonville)" 
+                        required
+                        autocomplete="off"
+                    >
+                    <small class="field-hint">Start typing and select from suggestions</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="hours_needed">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        Number of Hours Needed
+                    </label>
+                    <select 
+                        id="hours_needed" 
+                        name="hours_needed" 
+                        required
+                    >
+                        <option value="">Select hours</option>
+                        <option value="2">2 hours</option>
+                        <option value="3">3 hours</option>
+                        <option value="4">4 hours</option>
+                        <option value="5">5 hours</option>
+                        <option value="6">6 hours</option>
+                        <option value="8">8 hours</option>
+                        <option value="10">10 hours</option>
+                        <option value="12">12 hours</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="hourly_start_time">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        Start Time
+                    </label>
+                    <input 
+                        type="time" 
+                        id="hourly_start_time" 
+                        name="hourly_start_time" 
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="hourly_date">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        Date
+                    </label>
+                    <input 
+                        type="date" 
+                        id="hourly_date" 
+                        name="hourly_date" 
+                        required
+                        min=""
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="hourly_notes">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10,9 9,9 8,9"></polyline>
+                        </svg>
+                        Special Requests or Notes (Optional)
+                    </label>
+                    <textarea 
+                        id="hourly_notes" 
+                        name="hourly_notes" 
+                        placeholder="Any special requirements, multiple stops, etc."
+                        rows="3"
+                    ></textarea>
+                </div>
+
+                <!-- Price Display -->
+                <div class="price-display" id="hourlyPriceDisplay">
+                    <h3>Estimated Total: <span id="hourlyTotal">$0</span></h3>
+                    <p class="price-breakdown" id="priceBreakdown"></p>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="submit-btn" id="hourlySubmitBtn">
+                <span class="btn-text">Request Hourly Service</span>
+                <span class="btn-loading hidden">
+                    <svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Submitting...
+                </span>
+            </button>
+        </form>
+
         <!-- Footer -->
         <footer class="footer">
-            <p><strong>Sebastian Zimler</strong> - Your Local Driver</p>
+            <p><strong>Sebastian</strong> - Your Local Driver</p>
             <p>Serving Jacksonville & Northeast Florida</p>
             <p class="footer-tagline">Trust Local. Ride Safe. Experience the Difference.</p>
         </footer>
