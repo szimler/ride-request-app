@@ -148,6 +148,46 @@
         </div>
     </div>
 
+    <!-- Quote Popup Modal -->
+    <div id="quotePopup" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💵 Send Quote to Rider</h2>
+                <button class="modal-close" onclick="closeQuotePopup()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="quote-form">
+                    <div class="form-group">
+                        <label for="quotePrice">💰 Price ($)</label>
+                        <input type="number" id="quotePrice" placeholder="Enter price" min="0" step="0.01" required>
+                        <small class="form-hint">Calculated price will be pre-filled</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="quoteETA">🚗 ETA to Pickup (minutes)</label>
+                        <input type="number" id="quoteETA" placeholder="e.g., 15" min="1" step="1" required>
+                        <small class="form-hint">How long until you arrive at pickup location</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="quoteDuration">⏱️ Ride Duration (minutes)</label>
+                        <input type="number" id="quoteDuration" placeholder="e.g., 22" min="1" step="1" required>
+                        <small class="form-hint">Calculated duration will be pre-filled</small>
+                    </div>
+                    
+                    <div class="quote-preview" id="quotePreview">
+                        <strong>Quote Preview:</strong>
+                        <div id="quotePreviewText" class="preview-text"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeQuotePopup()">Cancel</button>
+                <button class="btn-primary" onclick="submitQuoteToRider()">📱 Send Quote via SMS</button>
+            </div>
+        </div>
+    </div>
+
     <script src="admin-app.js"></script>
 </body>
 </html>
