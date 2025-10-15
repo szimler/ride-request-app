@@ -1,149 +1,415 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { Pool } = require('pg');
+const bcrypt = require('bcrypt');
+require('dotenv').config();
 
-// Create database connection
-const dbPath = path.join(__dirname, 'ride_requests.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database:', err.message);
-  } else {
-    console.log('✓ Connected to SQLite database');
-    initializeDatabase();
+// Create PostgreSQL connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false // Required for Supabase and most cloud PostgreSQL providers
   }
 });
 
+// Test connection
+pool.on('connect', () => {
+  console.log('✓ Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle PostgreSQL client', err);
+  process.exit(-1);
+});
+
 // Initialize database tables
-function initializeDatabase() {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS ride_requests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      phone_number TEXT NOT NULL,
-      pickup_location TEXT NOT NULL,
-      dropoff_location TEXT NOT NULL,
-      requested_date TEXT NOT NULL,
-      requested_time TEXT NOT NULL,
-      status TEXT DEFAULT 'pending',
-      quote_price REAL,
-      pickup_eta_minutes INTEGER,
-      ride_duration_minutes INTEGER,
-      distance_miles REAL,
-      duration_minutes REAL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      notes TEXT
-    )
-  `, (err) => {
-    if (err) {
-      console.error('Error creating table:', err.message);
-    } else {
-      console.log('✓ Database table ready');
-      // Add new columns if they don't exist (for existing databases)
-      db.run(`ALTER TABLE ride_requests ADD COLUMN quote_price REAL`, (alterErr) => {
-        if (alterErr && !alterErr.message.includes('duplicate column')) {
-          console.error('Note: Could not add quote_price column (may already exist)');
-        }
-      });
-      db.run(`ALTER TABLE ride_requests ADD COLUMN pickup_eta_minutes INTEGER`, (alterErr) => {
-        if (alterErr && !alterErr.message.includes('duplicate column')) {
-          console.error('Note: Could not add pickup_eta_minutes column (may already exist)');
-        }
-      });
-      db.run(`ALTER TABLE ride_requests ADD COLUMN ride_duration_minutes INTEGER`, (alterErr) => {
-        if (alterErr && !alterErr.message.includes('duplicate column')) {
-          console.error('Note: Could not add ride_duration_minutes column (may already exist)');
-        }
-      });
-      db.run(`ALTER TABLE ride_requests ADD COLUMN distance_miles REAL`, (alterErr) => {
-        if (alterErr && !alterErr.message.includes('duplicate column')) {
-          console.error('Note: Could not add distance_miles column (may already exist)');
-        }
-      });
-      db.run(`ALTER TABLE ride_requests ADD COLUMN duration_minutes REAL`, (alterErr) => {
-        if (alterErr && !alterErr.message.includes('duplicate column')) {
-          console.error('Note: Could not add duration_minutes column (may already exist)');
-        }
-      });
+async function initializeDatabase() {
+  const client = await pool.connect();
+  
+  try {
+    // Ride requests table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ride_requests (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone_number TEXT NOT NULL,
+        pickup_location TEXT NOT NULL,
+        dropoff_location TEXT NOT NULL,
+        requested_date TEXT NOT NULL,
+        requested_time TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        quote_price DECIMAL(10, 2),
+        pickup_eta_minutes INTEGER,
+        ride_duration_minutes INTEGER,
+        distance_miles DECIMAL(10, 2),
+        duration_minutes DECIMAL(10, 2),
+        service_type TEXT,
+        hours_needed INTEGER,
+        start_time TEXT,
+        estimated_total DECIMAL(10, 2),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✓ Ride requests table ready');
+
+    // Admin users table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_users (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        email TEXT,
+        role TEXT DEFAULT 'admin',
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT NOW(),
+        last_login TIMESTAMP
+      )
+    `);
+    console.log('✓ Admin users table ready');
+
+    // Check if default admin exists
+    const adminCheck = await client.query('SELECT COUNT(*) as count FROM admin_users');
+    if (adminCheck.rows[0].count === '0') {
+      const defaultPassword = 'admin123';
+      const hash = await bcrypt.hash(defaultPassword, 10);
+      await client.query(`
+        INSERT INTO admin_users (username, password_hash, full_name, role)
+        VALUES ($1, $2, $3, $4)
+      `, ['admin', hash, 'Default Admin', 'super_admin']);
+      console.log('✓ Default admin user created (username: admin, password: admin123)');
     }
-  });
+
+    // Activity logs table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        username TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target_type TEXT,
+        target_id INTEGER,
+        details TEXT,
+        ip_address TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        FOREIGN KEY (user_id) REFERENCES admin_users(id)
+      )
+    `);
+    console.log('✓ Activity logs table ready');
+
+  } catch (err) {
+    console.error('Error initializing database:', err);
+    throw err;
+  } finally {
+    client.release();
+  }
 }
+
+// Initialize on startup
+initializeDatabase().catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
+});
 
 // Insert a new ride request
 function createRideRequest(requestData) {
-  return new Promise((resolve, reject) => {
-    const { name, phone_number, pickup_location, dropoff_location, requested_date, requested_time } = requestData;
-    
-    const sql = `
-      INSERT INTO ride_requests (name, phone_number, pickup_location, dropoff_location, requested_date, requested_time)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `;
-    
-    db.run(sql, [name, phone_number, pickup_location, dropoff_location, requested_date, requested_time], function(err) {
-      if (err) {
-        reject(err);
-      } else {
-        resolve({
-          id: this.lastID,
-          ...requestData
-        });
-      }
-    });
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { 
+        name, 
+        phone_number, 
+        pickup_location, 
+        dropoff_location, 
+        requested_date, 
+        requested_time,
+        service_type,
+        hours_needed,
+        start_time,
+        notes,
+        estimated_total
+      } = requestData;
+      
+      const sql = `
+        INSERT INTO ride_requests (
+          name, phone_number, pickup_location, dropoff_location, requested_date, requested_time,
+          service_type, hours_needed, start_time, notes, estimated_total
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *
+      `;
+      
+      const result = await pool.query(sql, [
+        name, 
+        phone_number, 
+        pickup_location, 
+        dropoff_location, 
+        requested_date, 
+        requested_time,
+        service_type || 'regular',
+        hours_needed || null,
+        start_time || null,
+        notes || null,
+        estimated_total || null
+      ]);
+      
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 // Get all ride requests
 function getAllRideRequests() {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM ride_requests ORDER BY created_at DESC', [], (err, rows) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(rows);
-      }
-    });
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('SELECT * FROM ride_requests ORDER BY created_at DESC');
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 // Get a single ride request by ID
 function getRideRequestById(id) {
-  return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM ride_requests WHERE id = ?', [id], (err, row) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(row);
-      }
-    });
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('SELECT * FROM ride_requests WHERE id = $1', [id]);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 // Update ride request status
 function updateRideRequestStatus(id, status, quotePrice = null, pickupEta = null, rideDuration = null, distanceMiles = null, durationMinutes = null) {
-  return new Promise((resolve, reject) => {
-    let sql, params;
-    
-    if (quotePrice !== null) {
-      sql = 'UPDATE ride_requests SET status = ?, quote_price = ?, pickup_eta_minutes = ?, ride_duration_minutes = ?, distance_miles = ?, duration_minutes = ? WHERE id = ?';
-      params = [status, quotePrice, pickupEta, rideDuration, distanceMiles, durationMinutes, id];
-    } else {
-      sql = 'UPDATE ride_requests SET status = ? WHERE id = ?';
-      params = [status, id];
-    }
-    
-    db.run(sql, params, function(err) {
-      if (err) {
-        reject(err);
+  return new Promise(async (resolve, reject) => {
+    try {
+      let sql, params;
+      
+      if (quotePrice !== null) {
+        sql = 'UPDATE ride_requests SET status = $1, quote_price = $2, pickup_eta_minutes = $3, ride_duration_minutes = $4, distance_miles = $5, duration_minutes = $6 WHERE id = $7 RETURNING *';
+        params = [status, quotePrice, pickupEta, rideDuration, distanceMiles, durationMinutes, id];
       } else {
-        resolve({ id, status, quotePrice, pickupEta, rideDuration, distanceMiles, durationMinutes, changes: this.changes });
+        sql = 'UPDATE ride_requests SET status = $1 WHERE id = $2 RETURNING *';
+        params = [status, id];
       }
-    });
+      
+      const result = await pool.query(sql, params);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// ===========================
+// ADMIN USER FUNCTIONS
+// ===========================
+
+// Create new admin user
+function createAdminUser(userData) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { username, password_hash, full_name, email, role } = userData;
+      const sql = `
+        INSERT INTO admin_users (username, password_hash, full_name, email, role)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, username, full_name, email, role
+      `;
+      const result = await pool.query(sql, [username, password_hash, full_name, email || null, role || 'admin']);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get admin user by username
+function getAdminUserByUsername(username) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('SELECT * FROM admin_users WHERE username = $1 AND is_active = 1', [username]);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get admin user by ID
+function getAdminUserById(id) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        'SELECT id, username, full_name, email, role, is_active, created_at, last_login FROM admin_users WHERE id = $1',
+        [id]
+      );
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get all admin users
+function getAllAdminUsers() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        'SELECT id, username, full_name, email, role, is_active, created_at, last_login FROM admin_users ORDER BY created_at DESC'
+      );
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Update admin user
+function updateAdminUser(id, updates) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { full_name, email, role, is_active, password_hash } = updates;
+      let sql = 'UPDATE admin_users SET full_name = $1, email = $2, role = $3, is_active = $4';
+      let params = [full_name, email, role, is_active];
+      
+      if (password_hash) {
+        sql += ', password_hash = $5 WHERE id = $6 RETURNING *';
+        params.push(password_hash, id);
+      } else {
+        sql += ' WHERE id = $5 RETURNING *';
+        params.push(id);
+      }
+      
+      const result = await pool.query(sql, params);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Update last login time
+function updateLastLogin(userId) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        'UPDATE admin_users SET last_login = NOW() WHERE id = $1 RETURNING *',
+        [userId]
+      );
+      resolve({ userId, updated: result.rowCount > 0 });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Delete admin user (soft delete - set is_active to 0)
+function deleteAdminUser(id) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('UPDATE admin_users SET is_active = 0 WHERE id = $1 RETURNING *', [id]);
+      resolve({ id, deleted: result.rowCount > 0 });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// ===========================
+// ACTIVITY LOG FUNCTIONS
+// ===========================
+
+// Create activity log entry
+function createActivityLog(logData) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { user_id, username, action, target_type, target_id, details, ip_address } = logData;
+      const sql = `
+        INSERT INTO activity_logs (user_id, username, action, target_type, target_id, details, ip_address)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+      `;
+      const result = await pool.query(sql, [
+        user_id, 
+        username, 
+        action, 
+        target_type || null, 
+        target_id || null, 
+        details || null, 
+        ip_address || null
+      ]);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get all activity logs with pagination
+function getActivityLogs(limit = 100, offset = 0) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        'SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+        [limit, offset]
+      );
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get activity logs for a specific user
+function getActivityLogsByUser(userId, limit = 50) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        'SELECT * FROM activity_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
+        [userId, limit]
+      );
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get activity logs for a specific ride request
+function getActivityLogsByRideRequest(rideRequestId) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        'SELECT * FROM activity_logs WHERE target_type = $1 AND target_id = $2 ORDER BY created_at DESC',
+        ['ride_request', rideRequestId]
+      );
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 module.exports = {
-  db,
+  pool,
   createRideRequest,
   getAllRideRequests,
   getRideRequestById,
-  updateRideRequestStatus
+  updateRideRequestStatus,
+  // Admin user functions
+  createAdminUser,
+  getAdminUserByUsername,
+  getAdminUserById,
+  getAllAdminUsers,
+  updateAdminUser,
+  updateLastLogin,
+  deleteAdminUser,
+  // Activity log functions
+  createActivityLog,
+  getActivityLogs,
+  getActivityLogsByUser,
+  getActivityLogsByRideRequest
 };
-
