@@ -7,7 +7,10 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false // Required for Supabase and most cloud PostgreSQL providers
-  }
+  },
+  // Force IPv4 to avoid network unreachable errors on some cloud providers
+  host: process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : undefined,
+  connectionTimeoutMillis: 10000
 });
 
 // Test connection
