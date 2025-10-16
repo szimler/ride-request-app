@@ -387,15 +387,27 @@ function displayRequests() {
             
             <div class="request-actions">
                 ${request.status === 'pending' ? `
-                    <button class="action-btn btn-info" onclick="preQuoteDriver(${request.id})" title="SMS driver for YES/NO confirmation">
-                        📱 Pre-Quote (Driver)
-                    </button>
-                    <button class="action-btn btn-confirm" onclick="showQuotePopup(${request.id})">
-                        💵 Send Quote to Rider
-                    </button>
-                    <button class="action-btn btn-cancel" onclick="notAvailableSMS(${request.id})">
-                        ✗ Not Available (SMS)
-                    </button>
+                    ${request.service_type === 'hourly' ? `
+                        <button class="action-btn btn-info" onclick="checkDriverAvailability(${request.id})" title="Contact driver to check availability">
+                            📞 Check Availability
+                        </button>
+                        <button class="action-btn btn-confirm" onclick="confirmHourlyBooking(${request.id})">
+                            ✓ Confirm Booking
+                        </button>
+                        <button class="action-btn btn-cancel" onclick="declineHourlyBooking(${request.id})">
+                            ✗ Decline
+                        </button>
+                    ` : `
+                        <button class="action-btn btn-info" onclick="preQuoteDriver(${request.id})" title="SMS driver for YES/NO confirmation">
+                            📱 Pre-Quote (Driver)
+                        </button>
+                        <button class="action-btn btn-confirm" onclick="showQuotePopup(${request.id})">
+                            💵 Send Quote to Rider
+                        </button>
+                        <button class="action-btn btn-cancel" onclick="notAvailableSMS(${request.id})">
+                            ✗ Not Available (SMS)
+                        </button>
+                    `}
                 ` : ''}
                 ${request.status === 'quoted' ? `
                     <button class="action-btn btn-copy" onclick="copyQuote(${request.id})" title="Copy quote details to clipboard">
@@ -1689,6 +1701,119 @@ function closeMigrationModal() {
     const modal = document.getElementById('migrationModal');
     if (modal) {
         modal.classList.add('hidden');
+    }
+}
+
+// ======================
+// HOURLY SERVICE FUNCTIONS
+// ======================
+
+// Check driver availability for hourly service
+async function checkDriverAvailability(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) return;
+    
+    if (!confirm(`Check availability with driver for ${request.hours_needed} hour${request.hours_needed > 1 ? 's' : ''} service?\n\nThis will send an SMS to the driver.`)) {
+        return;
+    }
+    
+    try {
+        // For now, this opens SMS app with pre-filled message
+        // In future, could trigger automatic SMS
+        const message = `Hourly Service Request:\n` +
+                       `Customer: ${request.name}\n` +
+                       `Pickup: ${request.pickup_location}\n` +
+                       `Date: ${formatDate(request.requested_date)}\n` +
+                       `Time: ${formatTime(request.requested_time)}\n` +
+                       `Duration: ${request.hours_needed} hour${request.hours_needed > 1 ? 's' : ''}\n` +
+                       `Estimated: $${request.estimated_total}\n\n` +
+                       `Are you available for this booking?`;
+        
+        // Open SMS app
+        window.open(`sms:${encodeURIComponent(request.phone_number)}?body=${encodeURIComponent(message)}`);
+        
+        showNotification('SMS app opened. Contact driver to confirm availability.', 'success');
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error opening SMS app', 'error');
+    }
+}
+
+// Confirm hourly booking
+async function confirmHourlyBooking(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) return;
+    
+    if (!confirm(`Confirm hourly booking for ${request.name}?\n\n` +
+                 `Duration: ${request.hours_needed} hour${request.hours_needed > 1 ? 's' : ''}\n` +
+                 `Estimated Total: $${request.estimated_total}\n\n` +
+                 `This will:\n` +
+                 `✓ Mark booking as confirmed\n` +
+                 `✓ Send confirmation SMS to customer\n` +
+                 `✓ Send booking details to driver`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/ride-requests/${requestId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                status: 'confirmed',
+                quotePrice: request.estimated_total || 0
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Hourly booking confirmed! SMS sent to customer and driver.', 'success');
+            await loadRideRequests();
+        } else {
+            showNotification(result.message || 'Failed to confirm booking', 'error');
+        }
+    } catch (error) {
+        console.error('Error confirming booking:', error);
+        showNotification('Error confirming booking', 'error');
+    }
+}
+
+// Decline hourly booking
+async function declineHourlyBooking(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) return;
+    
+    if (!confirm(`Decline hourly booking for ${request.name}?\n\n` +
+                 `This will send SMS notification to customer that driver is not available.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/ride-requests/${requestId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                status: 'not_available'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Booking declined. SMS sent to customer.', 'success');
+            await loadRideRequests();
+        } else {
+            showNotification(result.message || 'Failed to decline booking', 'error');
+        }
+    } catch (error) {
+        console.error('Error declining booking:', error);
+        showNotification('Error declining booking', 'error');
     }
 }
 
