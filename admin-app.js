@@ -378,8 +378,8 @@ function displayRequests() {
                         <div class="quote-info">💵 Rate: $${(parseFloat(request.quote_price) / request.hours_needed).toFixed(2)}/hour</div>
                         ${request.pickup_eta_minutes ? `<div class="quote-info">🚗 Pickup ETA: ${request.pickup_eta_minutes} minutes</div>` : ''}
                     ` : `
-                        ${request.distance_miles ? `<div class="quote-info">📏 Distance to Dropoff: ${request.distance_miles.toFixed(1)} miles</div>` : ''}
-                        ${request.duration_minutes ? `<div class="quote-info">⏱️ Estimated Drive Time: ${Math.round(request.duration_minutes)} minutes</div>` : ''}
+                        ${request.distance_miles && !isNaN(parseFloat(request.distance_miles)) ? `<div class="quote-info">📏 Distance to Dropoff: ${parseFloat(request.distance_miles).toFixed(1)} miles</div>` : ''}
+                        ${request.duration_minutes && !isNaN(parseFloat(request.duration_minutes)) ? `<div class="quote-info">⏱️ Estimated Drive Time: ${Math.round(parseFloat(request.duration_minutes))} minutes</div>` : ''}
                         ${request.pickup_eta_minutes ? `<div class="quote-info">🚗 Your Pickup ETA: ${request.pickup_eta_minutes} minutes</div>` : ''}
                         ${request.ride_duration_minutes ? `<div class="quote-info">🕐 Total Ride Duration: ${request.ride_duration_minutes} minutes</div>` : ''}
                     `}
