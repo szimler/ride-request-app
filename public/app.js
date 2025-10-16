@@ -102,21 +102,22 @@ function formatTimeDisplay(time24) {
     return `${hour12}:${minutes} ${ampm}`;
 }
 
-// Convert dropdown values to actual date/time
+// Convert date input and time dropdown values to actual date/time
 function convertDateTime() {
     const now = new Date();
     let finalDate = '';
     let finalTime = '';
     let displayTime = '';
     
-    // Handle date selection
+    // Handle date selection (now using date input, not dropdown)
     const dateValue = dateSelect.value;
-    if (dateValue === 'today') {
+    if (dateValue) {
+        // If date input has a value (YYYY-MM-DD format), convert to MM/DD/YYYY
+        const dateObj = new Date(dateValue + 'T00:00:00');
+        finalDate = formatDate(dateObj);
+    } else {
+        // Fallback to today if no date selected
         finalDate = formatDate(now);
-    } else if (dateValue === 'tomorrow') {
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        finalDate = formatDate(tomorrow);
     }
     
     // Handle time selection
@@ -592,16 +593,106 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Set minimum date for hourly form
+// Quick Date Button Functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Helper function to format date as YYYY-MM-DD
+    function formatDateForInput(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
+    // Get today and tomorrow dates
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const todayFormatted = formatDateForInput(today);
+    const tomorrowFormatted = formatDateForInput(tomorrow);
+    
+    // Regular Ride Quick Date Buttons
+    const regularDateInput = document.getElementById('requested_date');
+    const regularTodayBtn = document.getElementById('regularTodayBtn');
+    const regularTomorrowBtn = document.getElementById('regularTomorrowBtn');
+    
+    if (regularDateInput && regularDateInput.type === 'date') {
+        // Set minimum date to today
+        regularDateInput.min = todayFormatted;
+        regularDateInput.value = todayFormatted;
+        
+        if (regularTodayBtn) {
+            regularTodayBtn.classList.add('selected');
+            regularTodayBtn.addEventListener('click', function() {
+                regularDateInput.value = todayFormatted;
+                regularTodayBtn.classList.add('selected');
+                regularTomorrowBtn.classList.remove('selected');
+            });
+        }
+        
+        if (regularTomorrowBtn) {
+            regularTomorrowBtn.addEventListener('click', function() {
+                regularDateInput.value = tomorrowFormatted;
+                regularTomorrowBtn.classList.add('selected');
+                regularTodayBtn.classList.remove('selected');
+            });
+        }
+        
+        // Update button selection when date input changes manually
+        regularDateInput.addEventListener('change', function() {
+            if (this.value === todayFormatted) {
+                regularTodayBtn.classList.add('selected');
+                regularTomorrowBtn.classList.remove('selected');
+            } else if (this.value === tomorrowFormatted) {
+                regularTomorrowBtn.classList.add('selected');
+                regularTodayBtn.classList.remove('selected');
+            } else {
+                regularTodayBtn.classList.remove('selected');
+                regularTomorrowBtn.classList.remove('selected');
+            }
+        });
+    }
+    
+    // Hourly Service Quick Date Buttons
     const hourlyDateInput = document.getElementById('hourly_date');
+    const hourlyTodayBtn = document.getElementById('hourlyTodayBtn');
+    const hourlyTomorrowBtn = document.getElementById('hourlyTomorrowBtn');
+    
     if (hourlyDateInput && hourlyDateInput.type === 'date') {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        hourlyDateInput.min = `${year}-${month}-${day}`;
-        hourlyDateInput.value = `${year}-${month}-${day}`;
+        // Set minimum date to today
+        hourlyDateInput.min = todayFormatted;
+        hourlyDateInput.value = todayFormatted;
+        
+        if (hourlyTodayBtn) {
+            hourlyTodayBtn.classList.add('selected');
+            hourlyTodayBtn.addEventListener('click', function() {
+                hourlyDateInput.value = todayFormatted;
+                hourlyTodayBtn.classList.add('selected');
+                hourlyTomorrowBtn.classList.remove('selected');
+            });
+        }
+        
+        if (hourlyTomorrowBtn) {
+            hourlyTomorrowBtn.addEventListener('click', function() {
+                hourlyDateInput.value = tomorrowFormatted;
+                hourlyTomorrowBtn.classList.add('selected');
+                hourlyTodayBtn.classList.remove('selected');
+            });
+        }
+        
+        // Update button selection when date input changes manually
+        hourlyDateInput.addEventListener('change', function() {
+            if (this.value === todayFormatted) {
+                hourlyTodayBtn.classList.add('selected');
+                hourlyTomorrowBtn.classList.remove('selected');
+            } else if (this.value === tomorrowFormatted) {
+                hourlyTomorrowBtn.classList.add('selected');
+                hourlyTodayBtn.classList.remove('selected');
+            } else {
+                hourlyTodayBtn.classList.remove('selected');
+                hourlyTomorrowBtn.classList.remove('selected');
+            }
+        });
     }
 });
 
@@ -616,41 +707,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (requestAnotherRideBtn) {
         requestAnotherRideBtn.addEventListener('click', function() {
-            // Hide success message
-            successMessage.classList.add('hidden');
-            
-            // Reset both forms
-            regularForm.reset();
-            hourlyForm.reset();
-            
-            // Re-enable and reset service type buttons
-            regularRideBtn.classList.add('active');
-            regularRideBtn.classList.remove('disabled');
-            regularRideBtn.disabled = false;
-            regularRideBtn.style.pointerEvents = 'auto';
-            regularRideBtn.style.opacity = '1';
-            
-            hourlyRideBtn.classList.remove('active');
-            hourlyRideBtn.classList.remove('disabled');
-            hourlyRideBtn.disabled = false;
-            hourlyRideBtn.style.pointerEvents = 'auto';
-            hourlyRideBtn.style.opacity = '1';
-            
-            // Show regular ride form by default
-            regularForm.classList.remove('hidden');
-            hourlyForm.classList.add('hidden');
-            
-            // Reset hourly price display
-            const hourlyTotal = document.getElementById('hourlyTotal');
-            const priceBreakdown = document.getElementById('priceBreakdown');
-            if (hourlyTotal) hourlyTotal.textContent = '$0';
-            if (priceBreakdown) priceBreakdown.textContent = '';
-            
-            // Re-initialize autocomplete for pickup/dropoff
-            setTimeout(ensureAutocompleteInitialized, 100);
-            
-            // Scroll to top of form
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // Simple solution: Just reload the page to completely reset everything
+            window.location.reload();
         });
     }
 });

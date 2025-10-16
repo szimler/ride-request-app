@@ -699,6 +699,56 @@ html {
     color: var(--white);
 }
 
+/* Date Picker with Quick Buttons */
+.date-picker-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.quick-date-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.quick-date-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: 2px solid var(--primary-color);
+    background: white;
+    color: var(--primary-color);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.quick-date-btn:hover {
+    background: var(--primary-light);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.quick-date-btn.selected {
+    background: var(--primary-color);
+    color: white;
+}
+
+.date-picker-container input[type="date"] {
+    padding: 14px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.date-picker-container input[type="date"]:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
 /* Hourly Form Styling */
 .hourly-form-header {
     margin-bottom: 30px;
