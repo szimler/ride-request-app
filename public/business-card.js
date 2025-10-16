@@ -1,5 +1,5 @@
 // Get the current page URL for the vCard QR code
-const currentUrl = window.location.origin;
+const currentUrl = 'https://ride-request-app.onrender.com';
 const vcardUrl = `${currentUrl}/api/vcard`;
 
 // Generate QR code using Google Charts API
@@ -16,7 +16,7 @@ function generateQRCode() {
 // Share functionality
 document.getElementById('shareBtn').addEventListener('click', async () => {
     const shareData = {
-        title: 'Rides CEL - Digital Business Card',
+        title: 'Rider Service - Sebastian - Digital Business Card',
         text: 'Save my contact and request a ride anytime!',
         url: window.location.href
     };
@@ -77,4 +77,8 @@ document.querySelector('.btn-primary').addEventListener('click', () => {
 document.querySelector('.btn-secondary').addEventListener('click', () => {
     console.log('Redirecting to ride request');
 });
+
+
+
+
 

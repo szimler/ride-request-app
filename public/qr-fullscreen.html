@@ -115,7 +115,7 @@
 <body>
     <div class="qr-container">
         <div class="logo">🚕</div>
-        <h1>Sebastian's Ride Service</h1>
+        <h1>Rider Service - Sebastian</h1>
         <p class="subtitle">Scan to Request a Ride</p>
         
         <div id="qrcode"></div>
@@ -182,7 +182,7 @@
             ctx.fillStyle = '#1e40af';
             ctx.font = 'bold 36px system-ui';
             ctx.textAlign = 'center';
-            ctx.fillText('Sebastian\'s Ride Service', 300, 60);
+            ctx.fillText('Rider Service - Sebastian', 300, 60);
             
             // Add car emoji (approximation with text)
             ctx.font = '48px system-ui';
@@ -215,7 +215,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'Sebastian-Ride-Service-QR-Code.png';
+                a.download = 'RiderService-Sebastian-QR-Code.png';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
