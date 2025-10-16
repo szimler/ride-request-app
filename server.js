@@ -199,9 +199,9 @@ app.get('/print-qr', (req, res) => {
 
 // Generate vCard (VCF file) for contact saving
 app.get('/api/vcard', (req, res) => {
-  const businessName = 'Rides CEL';
+  const businessName = 'Rider Service - Sebastian';
   const phoneNumber = config.BUSINESS_PHONE_NUMBER || '+17142046318';
-  const website = `${req.protocol}://${req.get('host')}`;
+  const website = 'https://ride-request-app.onrender.com';
   
   // Create vCard format (version 3.0)
   const vcard = `BEGIN:VCARD
