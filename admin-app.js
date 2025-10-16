@@ -18,6 +18,7 @@ const loadingMessage = document.getElementById('loadingMessage');
 const emptyState = document.getElementById('emptyState');
 const searchInput = document.getElementById('searchInput');
 const statusFilter = document.getElementById('statusFilter');
+const sortFilter = document.getElementById('sortFilter');
 
 // Stats elements
 const totalRequestsEl = document.getElementById('totalRequests');
@@ -242,7 +243,7 @@ async function loadRideRequests() {
             allRequests = result.requests;
             filteredRequests = allRequests;
             updateStats();
-            displayRequests();
+            applyFilters(); // Apply current filter instead of just displaying all
         }
     } catch (error) {
         console.error('Error loading requests:', error);
@@ -609,14 +610,20 @@ async function updateStatus(requestId, newStatus, quotePrice = null, pickupEta =
     }
 }
 
-// Search and filter
-searchInput.addEventListener('input', applyFilters);
-statusFilter.addEventListener('change', applyFilters);
-
+// Search and filter - Initialize after DOM is ready
 function applyFilters() {
-    const searchTerm = searchInput.value.toLowerCase();
-    const statusValue = statusFilter.value;
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const statusValue = statusFilter ? statusFilter.value : 'all';
+    const sortValue = sortFilter ? sortFilter.value : 'date-desc';
     
+    console.log('🔍 Applying filters:', { 
+        searchTerm, 
+        statusValue, 
+        sortValue, 
+        totalRequests: allRequests.length 
+    });
+    
+    // Filter
     filteredRequests = allRequests.filter(request => {
         const matchesSearch = !searchTerm || 
             request.name.toLowerCase().includes(searchTerm) ||
@@ -626,11 +633,44 @@ function applyFilters() {
         
         const matchesStatus = statusValue === 'all' || request.status === statusValue;
         
+        console.log(`Request ${request.id}: ${request.name}, status: ${request.status}, matches: ${matchesSearch && matchesStatus}`);
+        
         return matchesSearch && matchesStatus;
     });
     
+    console.log('✅ Filtered results:', filteredRequests.length, 'out of', allRequests.length);
+    
+    // Sort
+    switch (sortValue) {
+        case 'date-desc':
+            // Newest first (default)
+            filteredRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            console.log('📅 Sorted by: Newest First');
+            break;
+        case 'date-asc':
+            // Oldest first
+            filteredRequests.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            console.log('📅 Sorted by: Oldest First');
+            break;
+        case 'name-asc':
+            // Name A-Z
+            filteredRequests.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+            console.log('👤 Sorted by: Name A-Z');
+            break;
+        case 'name-desc':
+            // Name Z-A
+            filteredRequests.sort((a, b) => b.name.toLowerCase().localeCompare(a.name.toLowerCase()));
+            console.log('👤 Sorted by: Name Z-A');
+            break;
+    }
+    
     displayRequests();
 }
+
+// Attach filter event listeners after DOM loads
+if (searchInput) searchInput.addEventListener('input', applyFilters);
+if (statusFilter) statusFilter.addEventListener('change', applyFilters);
+if (sortFilter) sortFilter.addEventListener('change', applyFilters);
 
 // Refresh button
 refreshBtn.addEventListener('click', async () => {
