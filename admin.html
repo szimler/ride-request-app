@@ -62,13 +62,6 @@
                     </span>
                 </button>
             </form>
-
-            <div class="default-credentials">
-                <p><strong>Default Credentials:</strong></p>
-                <p>Username: <code>admin</code></p>
-                <p>Password: <code>admin123</code></p>
-                <p class="warning-text">⚠️ Change these in config.js for security!</p>
-            </div>
         </div>
     </div>
 
@@ -85,6 +78,27 @@
                 <h1>Ride Requests Dashboard</h1>
             </div>
             <div class="header-right">
+                <button id="backupBtn" class="icon-btn" title="Backup & Export">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </button>
+                <button id="usersBtn" class="icon-btn" title="Manage Users">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </button>
+                <button id="settingsBtn" class="icon-btn" title="Settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
                 <button id="refreshBtn" class="icon-btn" title="Refresh">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="23 4 23 10 17 10"></polyline>
@@ -109,6 +123,30 @@
                 <div class="stat-card">
                     <div class="stat-number" id="todayRequests">0</div>
                     <div class="stat-label">Today</div>
+                </div>
+            </div>
+
+            <!-- Database Expiration Countdown -->
+            <div class="expiration-banner" id="expirationBanner">
+                <div class="expiration-content">
+                    <div class="expiration-icon">⏰</div>
+                    <div class="expiration-info">
+                        <h3>Database Backup Reminder</h3>
+                        <p>
+                            <strong id="daysRemaining">30</strong> days until Render PostgreSQL free tier expires
+                            <span class="expiration-date" id="expirationDate"></span>
+                        </p>
+                        <div class="expiration-actions">
+                            <button id="backupNowBtn" class="btn-primary-small">📥 Backup Now</button>
+                            <button id="viewInstructionsBtn" class="btn-secondary-small">📖 Migration Guide</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="expiration-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <small class="progress-label" id="progressLabel">All Good ✅</small>
                 </div>
             </div>
 
@@ -148,6 +186,39 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Settings</h2>
+                <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>🔔 Audio Notifications</h3>
+                    <div class="setting-item">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="audioEnabled" checked>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">Enable notification sound</span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label for="volumeControl">Volume</label>
+                        <div class="volume-control">
+                            <input type="range" id="volumeControl" min="0" max="100" value="50" step="5">
+                            <span id="volumeValue">50%</span>
+                        </div>
+                        <button class="test-sound-btn" onclick="testNotificationSound()">🔊 Test Sound</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeSettingsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Quote Popup Modal -->
     <div id="quotePopup" class="modal hidden">
         <div class="modal-content">
@@ -156,11 +227,33 @@
                 <button class="modal-close" onclick="closeQuotePopup()">&times;</button>
             </div>
             <div class="modal-body">
+                <div id="routeInfo" class="route-info hidden">
+                    <h3>📊 Route Calculation</h3>
+                    <div class="route-details">
+                        <div class="route-item">
+                            <span class="route-label">📏 Distance:</span>
+                            <span class="route-value" id="routeDistance">-</span>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-label">⏱️ Duration:</span>
+                            <span class="route-value" id="routeDuration">-</span>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-label">🎯 Trip Type:</span>
+                            <span class="route-value" id="routeTripType">-</span>
+                        </div>
+                        <div class="route-item">
+                            <span class="route-label">💡 Calculation:</span>
+                            <span class="route-value" id="routeCalculation">-</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="quote-form">
                     <div class="form-group">
                         <label for="quotePrice">💰 Price ($)</label>
                         <input type="number" id="quotePrice" placeholder="Enter price" min="0" step="0.01" required>
-                        <small class="form-hint">Calculated price will be pre-filled</small>
+                        <small class="form-hint">Calculated price is pre-filled - adjust if needed</small>
                     </div>
                     
                     <div class="form-group">
@@ -188,7 +281,206 @@
         </div>
     </div>
 
+    <!-- Backup & Export Modal -->
+    <div id="backupModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2>💾 Backup & Export Data</h2>
+                <button class="modal-close" onclick="closeBackupModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Database Statistics -->
+                <div class="backup-section">
+                    <h3>📊 Database Information</h3>
+                    <div id="dbStats" style="background: #F3F4F6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <p style="margin: 5px 0;"><strong>Location:</strong> <span id="dbPath">Loading...</span></p>
+                        <p style="margin: 5px 0;"><strong>Size:</strong> <span id="dbSize">Loading...</span></p>
+                        <p style="margin: 5px 0;"><strong>Last Modified:</strong> <span id="dbModified">Loading...</span></p>
+                        <p style="margin: 5px 0;"><strong>Ride Requests:</strong> <span id="dbRequestCount">0</span></p>
+                        <p style="margin: 5px 0;"><strong>Admin Users:</strong> <span id="dbUserCount">0</span></p>
+                        <p style="margin: 5px 0;"><strong>Activity Logs:</strong> <span id="dbLogCount">0</span></p>
+                    </div>
+                </div>
+
+                <!-- Create Backup -->
+                <div class="backup-section" style="margin-bottom: 25px;">
+                    <h3>💾 Create Backup</h3>
+                    <p style="color: #6B7280; margin-bottom: 15px;">Create a complete backup of all data (database file format)</p>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-primary" onclick="createBackup()">Create Backup Now</button>
+                        <button class="btn-secondary" onclick="exportToJSON()">Export as JSON (Human-Readable)</button>
+                    </div>
+                </div>
+
+                <!-- Backup List -->
+                <div class="backup-section">
+                    <h3>📦 Available Backups</h3>
+                    <div id="backupsList" style="max-height: 300px; overflow-y: auto;">
+                        <p style="text-align: center; color: #9CA3AF;">Loading backups...</p>
+                    </div>
+                </div>
+
+                <!-- Info Box -->
+                <div style="background: #EFF6FF; border-left: 4px solid #3B82F6; padding: 15px; margin-top: 20px; border-radius: 4px;">
+                    <p style="margin: 0; font-size: 14px; color: #1E40AF;">
+                        <strong>ℹ️ Backup Information:</strong><br>
+                        • Backups are stored in: <code style="background: white; padding: 2px 6px; border-radius: 3px;">F:\Cursor\APP RIDES CEL\backups\</code><br>
+                        • Database backups (.db) can be restored<br>
+                        • JSON exports (.json) are for viewing/archiving only<br>
+                        • Download backups to save them to your computer or cloud storage
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeBackupModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Migration Instructions Modal -->
+    <div id="migrationModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>📖 30-Day Database Migration Guide</h2>
+                <button class="modal-close" onclick="closeMigrationModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+                    <p style="margin: 0; font-size: 14px; color: #92400E;">
+                        <strong>⚠️ Important:</strong> Render's free PostgreSQL database expires after 30 days. Follow these steps to keep your data!
+                    </p>
+                </div>
+
+                <h3>🗓️ Timeline</h3>
+                <div style="margin-bottom: 25px; padding-left: 20px;">
+                    <p><strong>Days 1-25:</strong> ✅ All Good - Continue using normally</p>
+                    <p><strong>Days 25-28:</strong> ⚠️ Warning - Prepare for backup</p>
+                    <p><strong>Days 28-30:</strong> 🔴 Urgent - Export data NOW!</p>
+                </div>
+
+                <h3>📥 Step 1: Export Your Data (Day 28)</h3>
+                <ol style="margin-bottom: 25px;">
+                    <li>Click the <strong>"Backup Now"</strong> button above</li>
+                    <li>Click <strong>"Export as JSON"</strong> (human-readable backup)</li>
+                    <li>Also click <strong>"Create Backup Now"</strong> (SQL format)</li>
+                    <li>Both files will download to your computer</li>
+                    <li>Save them to: <code>F:\CURSOR BACKUPS\APP RIDES CEL BCKUPS\</code></li>
+                </ol>
+
+                <h3>🆕 Step 2: Create New Database (Day 29)</h3>
+                <ol style="margin-bottom: 25px;">
+                    <li>Go to <a href="https://dashboard.render.com/" target="_blank">Render Dashboard</a></li>
+                    <li>Click <strong>"New +"</strong> → <strong>"PostgreSQL"</strong></li>
+                    <li>Name: <code>rides-cel-db-2</code> (or similar)</li>
+                    <li>Region: <strong>Oregon (US West)</strong></li>
+                    <li>Plan: <strong>FREE</strong></li>
+                    <li>Click <strong>"Create Database"</strong></li>
+                    <li>Wait 2-3 minutes for it to be ready</li>
+                </ol>
+
+                <h3>🔗 Step 3: Update Connection (Day 29)</h3>
+                <ol style="margin-bottom: 25px;">
+                    <li>Copy the new database <strong>"Internal Database URL"</strong></li>
+                    <li>Go to your web service: <code>ride-request-app</code></li>
+                    <li>Click <strong>"Environment"</strong> → <strong>"Edit"</strong></li>
+                    <li>Update <code>DATABASE_URL</code> with new connection string</li>
+                    <li>Click <strong>"Save Changes"</strong></li>
+                    <li>Render will redeploy automatically (2-3 minutes)</li>
+                </ol>
+
+                <h3>📤 Step 4: Restore Your Data (Day 30)</h3>
+                <ol style="margin-bottom: 25px;">
+                    <li>Open terminal/command prompt on your computer</li>
+                    <li>Navigate to your project folder</li>
+                    <li>Run: <code>node restore-from-backup.js</code></li>
+                    <li>Or use the SQL file to restore manually</li>
+                    <li>Verify all data appears in admin panel</li>
+                </ol>
+
+                <h3>✅ Step 5: Verify & Clean Up</h3>
+                <ol style="margin-bottom: 25px;">
+                    <li>Login to admin panel</li>
+                    <li>Confirm all ride requests are there</li>
+                    <li>Delete old database from Render (optional, saves clutter)</li>
+                    <li>Reset the 30-day counter (automatic)</li>
+                    <li>Done! You have another 30 days free!</li>
+                </ol>
+
+                <div style="background: #EFF6FF; border-left: 4px solid #3B82F6; padding: 15px; margin-top: 20px; border-radius: 4px;">
+                    <p style="margin: 0; font-size: 14px; color: #1E40AF;">
+                        <strong>💡 Pro Tips:</strong><br>
+                        • Set a calendar reminder for day 25<br>
+                        • Keep backups in multiple locations (computer + cloud)<br>
+                        • Test the restore process once to feel confident<br>
+                        • Consider upgrading to paid ($7/month) if business is profitable
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeMigrationModal()">Close</button>
+                <button class="btn-primary" onclick="closeMigrationModal(); document.getElementById('backupBtn').click();">📥 Backup Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Management Modal -->
+    <div id="usersModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>👥 Manage Admin Users</h2>
+                <button class="modal-close" onclick="closeUsersModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="users-header" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3>Admin Users</h3>
+                    <button class="btn-primary" onclick="showCreateUserForm()" style="padding: 8px 16px;">+ Add New User</button>
+                </div>
+                
+                <!-- Create User Form (hidden by default) -->
+                <div id="createUserForm" class="hidden" style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0;">Create New Admin User</h4>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="newUsername" placeholder="Enter username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="newFullName" placeholder="Enter full name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email (Optional)</label>
+                        <input type="email" id="newEmail" placeholder="Enter email">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="newPassword" placeholder="Enter password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="newRole">
+                            <option value="admin">Admin</option>
+                            <option value="super_admin">Super Admin</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-primary" onclick="createUser()">Create User</button>
+                        <button class="btn-secondary" onclick="hideCreateUserForm()">Cancel</button>
+                    </div>
+                </div>
+                
+                <!-- Users List -->
+                <div id="usersList" class="users-list">
+                    <div class="loading-message">Loading users...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeUsersModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script src="admin-app.js"></script>
+    <script src="admin-backup-functions.js"></script>
 </body>
 </html>
 

@@ -2,6 +2,9 @@
 let isAuthenticated = false;
 let allRequests = [];
 let filteredRequests = [];
+let authToken = null;
+let currentUser = null;
+let socket = null;
 
 // DOM Elements
 const loginScreen = document.getElementById('loginScreen');
@@ -21,10 +24,32 @@ const totalRequestsEl = document.getElementById('totalRequests');
 const pendingRequestsEl = document.getElementById('pendingRequests');
 const todayRequestsEl = document.getElementById('todayRequests');
 
-// Check for saved session
-const savedAuth = sessionStorage.getItem('adminAuth');
-if (savedAuth === 'true') {
-    showDashboard();
+// Check for saved token and auto-login
+const savedToken = localStorage.getItem('adminToken');
+if (savedToken) {
+    verifyAndAutoLogin(savedToken);
+}
+
+async function verifyAndAutoLogin(token) {
+    try {
+        const response = await fetch('/api/admin/verify', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            authToken = token;
+            currentUser = result.user;
+            showDashboard();
+        } else {
+            localStorage.removeItem('adminToken');
+        }
+    } catch (error) {
+        console.error('Auto-login failed:', error);
+        localStorage.removeItem('adminToken');
+    }
 }
 
 // Login form handler
@@ -53,7 +78,10 @@ loginForm.addEventListener('submit', async (e) => {
         const result = await response.json();
         
         if (response.ok && result.success) {
-            sessionStorage.setItem('adminAuth', 'true');
+            authToken = result.token;
+            currentUser = result.user;
+            localStorage.setItem('adminToken', result.token);
+            localStorage.setItem('currentUser', JSON.stringify(result.user));
             showDashboard();
         } else {
             loginError.textContent = result.message || 'Invalid credentials';
@@ -71,8 +99,32 @@ loginForm.addEventListener('submit', async (e) => {
 });
 
 // Logout handler
-logoutBtn.addEventListener('click', () => {
-    sessionStorage.removeItem('adminAuth');
+logoutBtn.addEventListener('click', async () => {
+    try {
+        // Notify server
+        await fetch('/api/admin/logout', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+    
+    // Disconnect WebSocket
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+    
+    // Clear local data
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('currentUser');
+    authToken = null;
+    currentUser = null;
+    
+    // Show login screen
     loginScreen.classList.remove('hidden');
     dashboardScreen.classList.add('hidden');
     loginForm.reset();
@@ -83,9 +135,92 @@ function showDashboard() {
     loginScreen.classList.add('hidden');
     dashboardScreen.classList.remove('hidden');
     loadRideRequests();
+    initializeWebSocket();
     
-    // Auto-refresh every 30 seconds
-    setInterval(loadRideRequests, 30000);
+    // Fallback polling every 60 seconds (WebSocket handles most updates)
+    setInterval(loadRideRequests, 60000);
+}
+
+// Initialize WebSocket connection for real-time updates
+function initializeWebSocket() {
+    if (socket) return; // Already connected
+    
+    // Load Socket.IO client from CDN
+    if (typeof io === 'undefined') {
+        const script = document.createElement('script');
+        script.src = '/socket.io/socket.io.js';
+        script.onload = () => connectWebSocket();
+        document.head.appendChild(script);
+    } else {
+        connectWebSocket();
+    }
+}
+
+function connectWebSocket() {
+    socket = io({
+        auth: {
+            token: authToken
+        }
+    });
+    
+    // Authenticate
+    socket.emit('authenticate', authToken);
+    
+    // Connection events
+    socket.on('authenticated', (data) => {
+        console.log('✓ WebSocket connected:', data);
+        showNotification(`Connected as ${data.username}. ${data.connectedAdmins} admin(s) online`, 'success');
+    });
+    
+    socket.on('auth_error', (data) => {
+        console.error('WebSocket auth error:', data);
+        showNotification('Real-time connection failed', 'error');
+    });
+    
+    socket.on('admin_connected', (data) => {
+        showNotification(`${data.username} connected (${data.totalConnected} online)`, 'info');
+    });
+    
+    socket.on('admin_disconnected', (data) => {
+        showNotification(`${data.username} disconnected (${data.totalConnected} online)`, 'info');
+    });
+    
+    // Real-time ride request updates
+    socket.on('new_ride_request', (request) => {
+        console.log('New ride request:', request);
+        playNotificationSound();
+        showNotification('New ride request received!', 'success');
+        loadRideRequests(); // Reload to show new request
+    });
+    
+    socket.on('ride_request_updated', (data) => {
+        console.log('Ride request updated by:', data.updatedBy);
+        if (data.updatedBy !== currentUser.username) {
+            showNotification(`${data.updatedBy} updated a ride request`, 'info');
+        }
+        loadRideRequests(); // Reload to show changes
+    });
+    
+    socket.on('user_created', (user) => {
+        showNotification(`New admin user created: ${user.username}`, 'info');
+    });
+    
+    socket.on('user_updated', (data) => {
+        showNotification('Admin user updated', 'info');
+    });
+    
+    socket.on('user_deleted', (data) => {
+        showNotification('Admin user deactivated', 'info');
+    });
+    
+    socket.on('connect_error', (error) => {
+        console.error('WebSocket connection error:', error);
+        showNotification('Real-time connection lost. Using polling...', 'warning');
+    });
+    
+    socket.on('disconnect', () => {
+        console.log('WebSocket disconnected');
+    });
 }
 
 // Load all ride requests
@@ -95,6 +230,15 @@ async function loadRideRequests() {
         const result = await response.json();
         
         if (result.success) {
+            const newRequestCount = result.requests.length;
+            
+            // Check if there are new requests (audio notification)
+            if (previousRequestCount > 0 && newRequestCount > previousRequestCount) {
+                playNotificationSound();
+                showNotification('New ride request received!', 'success');
+            }
+            
+            previousRequestCount = newRequestCount;
             allRequests = result.requests;
             filteredRequests = allRequests;
             updateStats();
@@ -148,26 +292,41 @@ function displayRequests() {
             </div>
             
             <div class="request-details">
+                ${request.service_type === 'hourly' ? `
+                    <div class="detail-item" style="background: #FEF3C7; padding: 12px; border-radius: 8px; grid-column: 1 / -1;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <div class="detail-content">
+                            <div class="detail-label">🚗 HOURLY SERVICE</div>
+                            <div class="detail-value"><strong>${request.hours_needed} Hour${request.hours_needed > 1 ? 's' : ''} Needed</strong></div>
+                        </div>
+                    </div>
+                ` : ''}
+                
                 <div class="detail-item">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="10" r="3"></circle>
                         <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 6.9 8 11.7z"></path>
                     </svg>
                     <div class="detail-content">
-                        <div class="detail-label">Pickup</div>
+                        <div class="detail-label">${request.service_type === 'hourly' ? 'Starting Location' : 'Pickup'}</div>
                         <div class="detail-value">${escapeHtml(request.pickup_location)}</div>
                     </div>
                 </div>
                 
-                <div class="detail-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-                    </svg>
-                    <div class="detail-content">
-                        <div class="detail-label">Drop-off</div>
-                        <div class="detail-value">${escapeHtml(request.dropoff_location)}</div>
+                ${request.service_type !== 'hourly' ? `
+                    <div class="detail-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+                        </svg>
+                        <div class="detail-content">
+                            <div class="detail-label">Drop-off</div>
+                            <div class="detail-value">${escapeHtml(request.dropoff_location)}</div>
+                        </div>
                     </div>
-                </div>
+                ` : ''}
                 
                 <div class="detail-item">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -177,10 +336,26 @@ function displayRequests() {
                         <line x1="3" y1="10" x2="21" y2="10"></line>
                     </svg>
                     <div class="detail-content">
-                        <div class="detail-label">Date & Time</div>
+                        <div class="detail-label">${request.service_type === 'hourly' ? 'Start Date & Time' : 'Date & Time'}</div>
                         <div class="detail-value">${formatDate(request.requested_date)} at ${formatTime(request.requested_time)}</div>
                     </div>
                 </div>
+                
+                ${request.service_type === 'hourly' && request.notes ? `
+                    <div class="detail-item" style="grid-column: 1 / -1;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        <div class="detail-content">
+                            <div class="detail-label">Special Requests / Notes</div>
+                            <div class="detail-value">${escapeHtml(request.notes)}</div>
+                        </div>
+                    </div>
+                ` : ''}
                 
                 <div class="detail-item">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -197,10 +372,16 @@ function displayRequests() {
             ${request.quote_price ? `
                 <div class="quote-display">
                     <div class="quote-header"><strong>💰 Quote: $${parseFloat(request.quote_price).toFixed(2)}</strong></div>
-                    ${request.distance_miles ? `<div class="quote-info">📏 Distance to Dropoff: ${request.distance_miles.toFixed(1)} miles</div>` : ''}
-                    ${request.duration_minutes ? `<div class="quote-info">⏱️ Estimated Drive Time: ${Math.round(request.duration_minutes)} minutes</div>` : ''}
-                    ${request.pickup_eta_minutes ? `<div class="quote-info">🚗 Your Pickup ETA: ${request.pickup_eta_minutes} minutes</div>` : ''}
-                    ${request.ride_duration_minutes ? `<div class="quote-info">🕐 Total Ride Duration: ${request.ride_duration_minutes} minutes</div>` : ''}
+                    ${request.service_type === 'hourly' ? `
+                        <div class="quote-info">⏰ Service Duration: ${request.hours_needed} hour${request.hours_needed > 1 ? 's' : ''}</div>
+                        <div class="quote-info">💵 Rate: $${(parseFloat(request.quote_price) / request.hours_needed).toFixed(2)}/hour</div>
+                        ${request.pickup_eta_minutes ? `<div class="quote-info">🚗 Pickup ETA: ${request.pickup_eta_minutes} minutes</div>` : ''}
+                    ` : `
+                        ${request.distance_miles ? `<div class="quote-info">📏 Distance to Dropoff: ${request.distance_miles.toFixed(1)} miles</div>` : ''}
+                        ${request.duration_minutes ? `<div class="quote-info">⏱️ Estimated Drive Time: ${Math.round(request.duration_minutes)} minutes</div>` : ''}
+                        ${request.pickup_eta_minutes ? `<div class="quote-info">🚗 Your Pickup ETA: ${request.pickup_eta_minutes} minutes</div>` : ''}
+                        ${request.ride_duration_minutes ? `<div class="quote-info">🕐 Total Ride Duration: ${request.ride_duration_minutes} minutes</div>` : ''}
+                    `}
                 </div>
             ` : ''}
             
@@ -392,7 +573,10 @@ async function updateStatus(requestId, newStatus, quotePrice = null, pickupEta =
         
         const response = await fetch(`/api/ride-requests/${requestId}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
             body: JSON.stringify(body)
         });
         
@@ -544,13 +728,127 @@ style.textContent = `
 document.head.appendChild(style);
 
 // ============================================
+// AUDIO NOTIFICATIONS
+// ============================================
+
+let audioContext = null;
+let audioEnabled = true;
+let audioVolume = 0.5;
+
+// Load settings from localStorage
+function loadSettings() {
+    const savedAudioEnabled = localStorage.getItem('audioEnabled');
+    const savedVolume = localStorage.getItem('audioVolume');
+    
+    if (savedAudioEnabled !== null) {
+        audioEnabled = savedAudioEnabled === 'true';
+    }
+    
+    if (savedVolume !== null) {
+        audioVolume = parseFloat(savedVolume);
+    }
+    
+    // Update UI if elements exist
+    const audioEnabledCheckbox = document.getElementById('audioEnabled');
+    const volumeControl = document.getElementById('volumeControl');
+    const volumeValue = document.getElementById('volumeValue');
+    
+    if (audioEnabledCheckbox) audioEnabledCheckbox.checked = audioEnabled;
+    if (volumeControl) {
+        volumeControl.value = audioVolume * 100;
+        if (volumeValue) volumeValue.textContent = Math.round(audioVolume * 100) + '%';
+    }
+}
+
+// Save settings to localStorage
+function saveSettings() {
+    localStorage.setItem('audioEnabled', audioEnabled);
+    localStorage.setItem('audioVolume', audioVolume);
+}
+
+// Play notification sound
+function playNotificationSound() {
+    if (!audioEnabled) return;
+    
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(audioVolume, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+}
+
+// Test notification sound
+function testNotificationSound() {
+    playNotificationSound();
+    showNotification('Test sound played', 'info');
+}
+
+// Settings modal functions
+function openSettingsModal() {
+    document.getElementById('settingsModal').classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+    document.getElementById('settingsModal').classList.add('hidden');
+    saveSettings();
+}
+
+// Settings event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    const settingsBtn = document.getElementById('settingsBtn');
+    const audioEnabledCheckbox = document.getElementById('audioEnabled');
+    const volumeControl = document.getElementById('volumeControl');
+    const volumeValue = document.getElementById('volumeValue');
+    
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', openSettingsModal);
+    }
+    
+    if (audioEnabledCheckbox) {
+        audioEnabledCheckbox.addEventListener('change', function() {
+            audioEnabled = this.checked;
+            saveSettings();
+        });
+    }
+    
+    if (volumeControl) {
+        volumeControl.addEventListener('input', function() {
+            audioVolume = this.value / 100;
+            if (volumeValue) volumeValue.textContent = Math.round(this.value) + '%';
+            saveSettings();
+        });
+    }
+    
+    loadSettings();
+});
+
+// Track previous request count to detect new requests
+let previousRequestCount = 0;
+
+// Modified loadRideRequests to check for new requests
+const originalLoadRideRequests = loadRideRequests;
+
+// ============================================
 // NEW WORKFLOW FUNCTIONS
 // ============================================
 
 let currentQuoteRequestId = null;
 
 // 1. PRE-QUOTE TO DRIVER
-function preQuoteDriver(requestId) {
+async function preQuoteDriver(requestId) {
     const request = allRequests.find(r => r.id === requestId);
     if (!request) {
         showNotification('Request not found', 'error');
@@ -558,9 +856,67 @@ function preQuoteDriver(requestId) {
     }
     
     const driverPhone = '7142046318'; // Driver phone number
+    let message;
     
-    // Format the message
-    const message = `🚕 PRE-QUOTE REQUEST
+    // Check if this is an hourly service request
+    if (request.service_type === 'hourly') {
+        // HOURLY SERVICE - Different format
+        const estimatedTotal = request.estimated_total || (request.hours_needed * 45); // Default $45/hr if not calculated
+        
+        message = `🚗 HOURLY SERVICE REQUEST
+
+Rider: ${request.name}
+Phone: ${request.phone_number}
+
+📍 Starting Location: ${request.pickup_location}
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Start Time: ${formatTime(request.requested_time)}
+
+⏱️ Hours Needed: ${request.hours_needed} hour${request.hours_needed > 1 ? 's' : ''}
+💰 Estimated Total: $${estimatedTotal.toFixed(2)}
+💵 Rate: ~$${(estimatedTotal / request.hours_needed).toFixed(2)}/hour
+
+${request.notes ? `📝 Notes: ${request.notes}` : ''}
+
+Reply with:
+✓ YES $__ ETA __ min (confirm price & pickup time)
+✗ NO (not available)`;
+        
+    } else {
+        // STANDARD TRIP - Calculate route if not already done
+        if (!request.distance_miles) {
+            showNotification('Calculating route...', 'info');
+            try {
+                const response = await fetch('/api/calculate-route', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pickup_location: request.pickup_location,
+                        dropoff_location: request.dropoff_location
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    request.distance_miles = result.route.distance.miles;
+                    request.duration_minutes = result.route.duration.minutes;
+                    request.suggested_price = result.pricing.suggestedPrice;
+                    request.trip_type = result.pricing.tripType;
+                    request.calculation = result.pricing.calculation;
+                    
+                    showNotification(`Route calculated: ${request.distance_miles.toFixed(1)} miles, $${request.suggested_price}`, 'success');
+                } else {
+                    showNotification(result.message || 'Failed to calculate route', 'warning');
+                }
+            } catch (error) {
+                console.error('Error calculating route:', error);
+                showNotification('Error calculating route', 'warning');
+            }
+        }
+        
+        // Format standard trip message
+        message = `🚕 PRE-QUOTE REQUEST
 
 Rider: ${request.name}
 Phone: ${request.phone_number}
@@ -572,9 +928,15 @@ Phone: ${request.phone_number}
 ⏰ Time: ${formatTime(request.requested_time)}
 
 ${request.distance_miles ? `📏 Distance: ${request.distance_miles.toFixed(1)} miles` : ''}
-${request.duration_minutes ? `⏱️ Estimated Time: ${Math.round(request.duration_minutes)} minutes` : ''}
+${request.duration_minutes ? `⏱️ Duration: ${Math.round(request.duration_minutes)} minutes` : ''}
+${request.suggested_price ? `💰 Suggested Price: $${request.suggested_price}` : ''}
+${request.calculation ? `📊 Calculation: ${request.calculation}` : ''}
 
-Please reply YES with your ETA or NO if unavailable`;
+Reply with:
+✓ YES $${request.suggested_price || '__'} ETA __ min (accept suggested price)
+✓ YES $__ ETA __ min (suggest different price)
+✗ NO (not available)`;
+    }
 
     // Open SMS app
     const smsLink = `sms:${driverPhone}?&body=${encodeURIComponent(message)}`;
@@ -585,42 +947,99 @@ Please reply YES with your ETA or NO if unavailable`;
 
 // 2. SHOW QUOTE POPUP
 async function showQuotePopup(requestId) {
+    console.log('=== SHOW QUOTE POPUP CALLED ===');
+    console.log('Request ID:', requestId);
+    
     const request = allRequests.find(r => r.id === requestId);
     if (!request) {
+        console.error('Request not found!');
         showNotification('Request not found', 'error');
         return;
     }
     
+    console.log('Request found:', request);
+    console.log('Service Type:', request.service_type);
+    
     currentQuoteRequestId = requestId;
     
-    // Calculate route if not already done
-    if (!request.distance_miles) {
-        showNotification('Calculating route...', 'info');
-        try {
-            const response = await fetch('/api/calculate-route', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    pickup: request.pickup_location,
-                    dropoff: request.dropoff_location
-                })
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-                request.distance_miles = result.distance_miles;
-                request.duration_minutes = result.duration_minutes;
-                request.suggested_price = result.suggested_price;
-            }
-        } catch (error) {
-            console.error('Error calculating route:', error);
-        }
-    }
+    const routeInfo = document.getElementById('routeInfo');
     
-    // Pre-fill the popup
-    document.getElementById('quotePrice').value = request.suggested_price || request.quote_price || '';
-    document.getElementById('quoteETA').value = request.pickup_eta_minutes || 15;
-    document.getElementById('quoteDuration').value = request.duration_minutes ? Math.round(request.duration_minutes) : '';
+    // Handle HOURLY SERVICE differently
+    if (request.service_type === 'hourly') {
+        // HOURLY SERVICE - Show hourly pricing info
+        const estimatedTotal = request.estimated_total || (request.hours_needed * 45);
+        const hourlyRate = estimatedTotal / request.hours_needed;
+        
+        document.getElementById('routeDistance').textContent = `${request.hours_needed} Hour${request.hours_needed > 1 ? 's' : ''}`;
+        document.getElementById('routeDuration').textContent = `Starting at ${formatTime(request.requested_time)}`;
+        document.getElementById('routeTripType').textContent = 'HOURLY SERVICE';
+        document.getElementById('routeCalculation').textContent = `$${hourlyRate.toFixed(2)}/hour × ${request.hours_needed} hours`;
+        routeInfo.classList.remove('hidden');
+        
+        // Pre-fill with hourly pricing
+        document.getElementById('quotePrice').value = estimatedTotal.toFixed(2);
+        document.getElementById('quoteETA').value = 15;
+        document.getElementById('quoteDuration').value = request.hours_needed * 60; // Convert hours to minutes
+        
+    } else {
+        // STANDARD TRIP - Calculate route if not already done
+        if (!request.distance_miles) {
+            console.log('🚀 No distance found, calling API...');
+            showNotification('Calculating route...', 'info');
+            try {
+                const response = await fetch('/api/calculate-route', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pickup_location: request.pickup_location,
+                        dropoff_location: request.dropoff_location
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Route calculation result:', result);
+                
+                if (result.success) {
+                    // Extract data from nested structure
+                    request.distance_miles = result.route.distance.miles;
+                    request.duration_minutes = result.route.duration.minutes;
+                    request.suggested_price = result.pricing.suggestedPrice;
+                    request.trip_type = result.pricing.tripType;
+                    request.calculation = result.pricing.calculation;
+                    
+                    console.log('✅ Parsed data:', {
+                        distance: request.distance_miles,
+                        duration: request.duration_minutes,
+                        price: request.suggested_price,
+                        type: request.trip_type
+                    });
+                    
+                    showNotification(`Route calculated: ${request.distance_miles.toFixed(1)} miles, $${request.suggested_price}`, 'success');
+                } else {
+                    showNotification(result.message || 'Failed to calculate route', 'error');
+                }
+            } catch (error) {
+                console.error('Error calculating route:', error);
+                showNotification('Error calculating route', 'error');
+            }
+        }
+        
+        // Display route information if available
+        if (request.distance_miles) {
+            document.getElementById('routeDistance').textContent = `${request.distance_miles.toFixed(1)} miles`;
+            document.getElementById('routeDuration').textContent = `${Math.round(request.duration_minutes)} minutes`;
+            document.getElementById('routeTripType').textContent = request.trip_type ? request.trip_type.toUpperCase() : 'N/A';
+            document.getElementById('routeCalculation').textContent = request.calculation || 'N/A';
+            routeInfo.classList.remove('hidden');
+        } else {
+            routeInfo.classList.add('hidden');
+        }
+        
+        // Pre-fill the popup
+        document.getElementById('quotePrice').value = request.suggested_price || request.quote_price || '';
+        document.getElementById('quoteETA').value = request.pickup_eta_minutes || 15;
+        document.getElementById('quoteDuration').value = request.duration_minutes ? Math.round(request.duration_minutes) : '';
+    }
     
     // Show popup
     document.getElementById('quotePopup').classList.remove('hidden');
@@ -631,8 +1050,30 @@ async function showQuotePopup(requestId) {
         const eta = document.getElementById('quoteETA').value;
         const duration = document.getElementById('quoteDuration').value;
         
-        if (price && eta && duration) {
-            const previewText = `Hi ${request.name}!
+        if (price && eta) {
+            let previewText;
+            
+            if (request.service_type === 'hourly') {
+                // HOURLY SERVICE PREVIEW
+                previewText = `Hi ${request.name}!
+
+Your Hourly Service Quote:
+
+📍 Starting Location: ${request.pickup_location}
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Start Time: ${formatTime(request.requested_time)}
+
+⏱️ Service Duration: ${request.hours_needed} hour${request.hours_needed > 1 ? 's' : ''}
+💰 Total Price: $${parseFloat(price).toFixed(2)}
+💵 Rate: $${(parseFloat(price) / request.hours_needed).toFixed(2)}/hour
+🚗 Estimated Pickup: ${eta} minutes
+
+${request.notes ? `📝 Special Requests: ${request.notes}\n\n` : ''}Payment: Cash, Venmo or Zelle
+
+Do you accept the quote? Please reply YES or NO`;
+            } else {
+                // STANDARD TRIP PREVIEW
+                previewText = `Hi ${request.name}!
 
 Your Ride Quote:
 
@@ -643,9 +1084,11 @@ Your Ride Quote:
 
 💰 Price: $${parseFloat(price).toFixed(2)}
 🚗 Estimated Pickup: ${eta} minutes
-⏱️ Ride Duration: ${duration} minutes
+${duration ? `⏱️ Ride Duration: ${duration} minutes\n` : ''}
+Payment: Cash, Venmo or Zelle
 
 Do you accept the quote? Please reply YES or NO`;
+            }
             
             document.getElementById('quotePreviewText').textContent = previewText;
         }
@@ -685,25 +1128,34 @@ async function submitQuoteToRider() {
     
     // Update request in database
     try {
+        console.log('📤 Sending quote update:', { price, eta, duration });
+        
         const response = await fetch(`/api/ride-requests/${currentQuoteRequestId}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
             body: JSON.stringify({
                 status: 'quoted',
-                quote_price: price,
-                pickup_eta_minutes: eta,
-                ride_duration_minutes: duration
+                quotePrice: price,  // Changed to camelCase
+                pickupEta: eta,     // Changed to camelCase
+                rideDuration: duration  // Changed to camelCase
             })
         });
         
         const result = await response.json();
+        console.log('📥 Server response:', result);
+        
         if (!result.success) {
-            showNotification('Failed to update quote', 'error');
+            showNotification(`Failed to update quote: ${result.message || 'Unknown error'}`, 'error');
             return;
         }
+        
+        console.log('✅ Quote updated successfully in database');
     } catch (error) {
-        console.error('Error updating quote:', error);
-        showNotification('Error updating quote', 'error');
+        console.error('❌ Error updating quote:', error);
+        showNotification(`Error updating quote: ${error.message}`, 'error');
         return;
     }
     
@@ -720,6 +1172,8 @@ Your Ride Quote:
 💰 Price: $${price.toFixed(2)}
 🚗 Estimated Pickup: ${eta} minutes
 ⏱️ Ride Duration: ${duration} minutes
+
+Payment: Cash, Venmo or Zelle
 
 Do you accept the quote? Please reply YES or NO`;
     
@@ -742,7 +1196,38 @@ function copyQuote(requestId) {
         return;
     }
     
-    const quoteText = `Hi ${request.name}!
+    let quoteText;
+    
+    // Add rider info header
+    const riderInfo = `RIDER INFO:
+👤 Name: ${request.name}
+📞 Phone: ${request.phone_number}
+
+---
+
+`;
+    
+    if (request.service_type === 'hourly') {
+        // HOURLY SERVICE QUOTE
+        quoteText = riderInfo + `Hi ${request.name}!
+
+Your Hourly Service Quote:
+
+📍 Starting Location: ${request.pickup_location}
+📅 Date: ${formatDate(request.requested_date)}
+⏰ Start Time: ${formatTime(request.requested_time)}
+
+⏱️ Service Duration: ${request.hours_needed} hour${request.hours_needed > 1 ? 's' : ''}
+💰 Total Price: $${parseFloat(request.quote_price).toFixed(2)}
+💵 Rate: $${(parseFloat(request.quote_price) / request.hours_needed).toFixed(2)}/hour
+${request.pickup_eta_minutes ? `🚗 Estimated Pickup: ${request.pickup_eta_minutes} minutes\n` : ''}
+${request.notes ? `📝 Special Requests: ${request.notes}\n` : ''}
+Payment: Cash, Venmo or Zelle
+
+Do you accept the quote? Please reply YES or NO`;
+    } else {
+        // STANDARD TRIP QUOTE
+        quoteText = riderInfo + `Hi ${request.name}!
 
 Your Ride Quote:
 
@@ -752,10 +1237,12 @@ Your Ride Quote:
 ⏰ Time: ${formatTime(request.requested_time)}
 
 💰 Price: $${parseFloat(request.quote_price).toFixed(2)}
-${request.pickup_eta_minutes ? `🚗 Estimated Pickup: ${request.pickup_eta_minutes} minutes` : ''}
-${request.ride_duration_minutes ? `⏱️ Ride Duration: ${request.ride_duration_minutes} minutes` : ''}
+${request.pickup_eta_minutes ? `🚗 Estimated Pickup: ${request.pickup_eta_minutes} minutes\n` : ''}
+${request.ride_duration_minutes ? `⏱️ Ride Duration: ${request.ride_duration_minutes} minutes\n` : ''}
+Payment: Cash, Venmo or Zelle
 
 Do you accept the quote? Please reply YES or NO`;
+    }
     
     // Copy to clipboard
     navigator.clipboard.writeText(quoteText).then(() => {
@@ -787,6 +1274,8 @@ Your Ride Quote:
 ${request.pickup_eta_minutes ? `🚗 Estimated Pickup: ${request.pickup_eta_minutes} minutes` : ''}
 ${request.ride_duration_minutes ? `⏱️ Ride Duration: ${request.ride_duration_minutes} minutes` : ''}
 
+Payment: Cash, Venmo or Zelle
+
 Do you accept the quote? Please reply YES or NO`;
     
     const smsLink = `sms:${request.phone_number}?&body=${encodeURIComponent(message)}`;
@@ -807,7 +1296,10 @@ async function confirmAndSMSDriver(requestId) {
     try {
         const response = await fetch(`/api/ride-requests/${requestId}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
             body: JSON.stringify({ status: 'confirmed' })
         });
         
@@ -910,7 +1402,10 @@ Thank you for your understanding!`;
         try {
             await fetch(`/api/ride-requests/${requestId}/status`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
                 body: JSON.stringify({ status: 'not_available' })
             });
             loadRideRequests();
@@ -921,4 +1416,279 @@ Thank you for your understanding!`;
 }
 
 console.log('🚕 Admin Dashboard initialized with full workflow');
+
+// ============================================
+// USER MANAGEMENT FUNCTIONS
+// ============================================
+
+// Open users modal
+function openUsersModal() {
+    document.getElementById('usersModal').classList.remove('hidden');
+    loadAdminUsers();
+}
+
+// Close users modal
+function closeUsersModal() {
+    document.getElementById('usersModal').classList.add('hidden');
+    hideCreateUserForm();
+}
+
+// Show create user form
+function showCreateUserForm() {
+    document.getElementById('createUserForm').classList.remove('hidden');
+}
+
+// Hide create user form
+function hideCreateUserForm() {
+    document.getElementById('createUserForm').classList.add('hidden');
+    // Clear form
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newFullName').value = '';
+    document.getElementById('newEmail').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('newRole').value = 'admin';
+}
+
+// Load all admin users
+async function loadAdminUsers() {
+    try {
+        const response = await fetch('/api/admin/users', {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            displayAdminUsers(result.users);
+        } else {
+            showNotification('Failed to load users', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        showNotification('Error loading users', 'error');
+    }
+}
+
+// Display admin users
+function displayAdminUsers(users) {
+    const usersList = document.getElementById('usersList');
+    
+    if (users.length === 0) {
+        usersList.innerHTML = '<p style="text-align: center; color: #6B7280;">No users found</p>';
+        return;
+    }
+    
+    usersList.innerHTML = users.map(user => `
+        <div class="user-card" style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin: 0 0 4px 0; font-size: 16px;">${escapeHtml(user.full_name)}</h4>
+                    <p style="margin: 0; color: #6B7280; font-size: 14px;">
+                        @${escapeHtml(user.username)} 
+                        ${user.email ? `• ${escapeHtml(user.email)}` : ''}
+                    </p>
+                    <div style="margin-top: 8px; display: flex; gap: 8px;">
+                        <span style="background: ${user.role === 'super_admin' ? '#F59E0B' : '#3B82F6'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                            ${user.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                        </span>
+                        <span style="background: ${user.is_active ? '#10B981' : '#EF4444'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                            ${user.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                    </div>
+                    ${user.last_login ? `<p style="margin: 8px 0 0 0; color: #9CA3AF; font-size: 12px;">Last login: ${formatDateTime(user.last_login)}</p>` : ''}
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    ${user.id !== currentUser.id ? `
+                        <button onclick="toggleUserStatus(${user.id}, ${user.is_active})" 
+                                style="padding: 6px 12px; background: ${user.is_active ? '#EF4444' : '#10B981'}; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            ${user.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                    ` : '<span style="color: #9CA3AF; font-size: 12px;">(You)</span>'}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Create new user
+async function createUser() {
+    const username = document.getElementById('newUsername').value.trim();
+    const full_name = document.getElementById('newFullName').value.trim();
+    const email = document.getElementById('newEmail').value.trim();
+    const password = document.getElementById('newPassword').value;
+    const role = document.getElementById('newRole').value;
+    
+    if (!username || !full_name || !password) {
+        showNotification('Please fill in all required fields', 'error');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showNotification('Password must be at least 6 characters', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ username, full_name, email, password, role })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('User created successfully!', 'success');
+            hideCreateUserForm();
+            loadAdminUsers();
+        } else {
+            showNotification(result.message || 'Failed to create user', 'error');
+        }
+    } catch (error) {
+        console.error('Error creating user:', error);
+        showNotification('Error creating user', 'error');
+    }
+}
+
+// Toggle user active status
+async function toggleUserStatus(userId, currentStatus) {
+    const newStatus = currentStatus ? 0 : 1;
+    const action = newStatus ? 'activate' : 'deactivate';
+    
+    if (!confirm(`Are you sure you want to ${action} this user?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/users/${userId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ is_active: newStatus })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification(`User ${action}d successfully`, 'success');
+            loadAdminUsers();
+        } else {
+            showNotification(result.message || `Failed to ${action} user`, 'error');
+        }
+    } catch (error) {
+        console.error('Error updating user:', error);
+        showNotification('Error updating user', 'error');
+    }
+}
+
+// Add event listener for users button
+document.addEventListener('DOMContentLoaded', function() {
+    const usersBtn = document.getElementById('usersBtn');
+    if (usersBtn) {
+        usersBtn.addEventListener('click', openUsersModal);
+    }
+    
+    // Initialize expiration countdown
+    initializeExpirationCountdown();
+    
+    // Add button handlers
+    const backupNowBtn = document.getElementById('backupNowBtn');
+    const viewInstructionsBtn = document.getElementById('viewInstructionsBtn');
+    
+    if (backupNowBtn) {
+        backupNowBtn.addEventListener('click', () => {
+            document.getElementById('backupBtn').click();
+        });
+    }
+    
+    if (viewInstructionsBtn) {
+        viewInstructionsBtn.addEventListener('click', openMigrationModal);
+    }
+});
+
+// ======================
+// DATABASE EXPIRATION COUNTDOWN
+// ======================
+
+// Set your database creation date here (October 15, 2025)
+const DATABASE_CREATED = new Date('2025-10-15');
+const FREE_TIER_DAYS = 30;
+
+function initializeExpirationCountdown() {
+    updateCountdown();
+    // Update every hour
+    setInterval(updateCountdown, 1000 * 60 * 60);
+}
+
+function updateCountdown() {
+    const now = new Date();
+    const expirationDate = new Date(DATABASE_CREATED);
+    expirationDate.setDate(expirationDate.getDate() + FREE_TIER_DAYS);
+    
+    const daysRemaining = Math.ceil((expirationDate - now) / (1000 * 60 * 60 * 24));
+    
+    const banner = document.getElementById('expirationBanner');
+    const daysElement = document.getElementById('daysRemaining');
+    const dateElement = document.getElementById('expirationDate');
+    const progressFill = document.getElementById('progressFill');
+    const progressLabel = document.getElementById('progressLabel');
+    
+    if (!banner || !daysElement || !dateElement || !progressFill || !progressLabel) {
+        return;
+    }
+    
+    // Update days remaining
+    daysElement.textContent = daysRemaining;
+    
+    // Update expiration date
+    dateElement.textContent = `(Expires: ${expirationDate.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+    })})`;
+    
+    // Calculate progress (inverse - starts full, decreases over time)
+    const progressPercent = (daysRemaining / FREE_TIER_DAYS) * 100;
+    progressFill.style.width = `${progressPercent}%`;
+    
+    // Update banner status based on days remaining
+    banner.classList.remove('warning', 'urgent');
+    
+    if (daysRemaining <= 2) {
+        banner.classList.add('urgent');
+        progressLabel.textContent = '🔴 URGENT - Backup NOW!';
+    } else if (daysRemaining <= 5) {
+        banner.classList.add('warning');
+        progressLabel.textContent = '⚠️ Warning - Prepare Backup Soon';
+    } else {
+        progressLabel.textContent = '✅ All Good';
+    }
+    
+    // Hide banner if expired
+    if (daysRemaining < 0) {
+        banner.style.display = 'none';
+    }
+}
+
+// Migration Modal Functions
+function openMigrationModal() {
+    const modal = document.getElementById('migrationModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeMigrationModal() {
+    const modal = document.getElementById('migrationModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
 
