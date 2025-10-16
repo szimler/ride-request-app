@@ -287,6 +287,13 @@ function displayRequests() {
                         <a href="sms:${request.phone_number}" class="sms-link">
                             💬 Text
                         </a>
+                        <button 
+                            class="add-customer-btn" 
+                            onclick="quickAddToCustomers(${request.id})" 
+                            title="Add to Customer Database"
+                        >
+                            ➕ Save Customer
+                        </button>
                     </div>
                 </div>
                 <span class="status-badge status-${request.status}">${request.status}</span>
@@ -399,15 +406,15 @@ function displayRequests() {
                             ✗ Decline
                         </button>
                     ` : `
-                        <button class="action-btn btn-info" onclick="preQuoteDriver(${request.id})" title="SMS driver for YES/NO confirmation">
-                            📱 Pre-Quote (Driver)
-                        </button>
-                        <button class="action-btn btn-confirm" onclick="showQuotePopup(${request.id})">
-                            💵 Send Quote to Rider
-                        </button>
-                        <button class="action-btn btn-cancel" onclick="notAvailableSMS(${request.id})">
-                            ✗ Not Available (SMS)
-                        </button>
+                    <button class="action-btn btn-info" onclick="preQuoteDriver(${request.id})" title="SMS driver for YES/NO confirmation">
+                        📱 Pre-Quote (Driver)
+                    </button>
+                    <button class="action-btn btn-confirm" onclick="showQuotePopup(${request.id})">
+                        💵 Send Quote to Rider
+                    </button>
+                    <button class="action-btn btn-cancel" onclick="notAvailableSMS(${request.id})">
+                        ✗ Not Available (SMS)
+                    </button>
                     `}
                 ` : ''}
                 ${request.status === 'quoted' ? `
@@ -1743,6 +1750,394 @@ function closeMigrationModal() {
         modal.classList.add('hidden');
     }
 }
+
+// ======================
+// CUSTOMER MANAGEMENT FUNCTIONS
+// ======================
+
+let allCustomers = [];
+let filteredCustomers = [];
+let editingCustomerId = null;
+
+// Open customers modal
+function openCustomersModal() {
+    const modal = document.getElementById('customersModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        loadCustomers();
+    }
+}
+
+// Close customers modal
+function closeCustomersModal() {
+    const modal = document.getElementById('customersModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        cancelAddCustomer();
+    }
+}
+
+// Load all customers
+async function loadCustomers() {
+    try {
+        const response = await fetch('/api/customers', {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            allCustomers = result.customers;
+            filteredCustomers = allCustomers;
+            displayCustomers();
+            updateCustomerStats();
+        }
+    } catch (error) {
+        console.error('Error loading customers:', error);
+        showNotification('Error loading customers', 'error');
+    }
+}
+
+// Display customers
+function displayCustomers() {
+    const customersList = document.getElementById('customersList');
+    
+    if (!customersList) return;
+    
+    if (filteredCustomers.length === 0) {
+        customersList.innerHTML = '<p style="text-align: center; color: #9CA3AF; padding: 40px;">No customers found</p>';
+        return;
+    }
+    
+    customersList.innerHTML = filteredCustomers.map(customer => `
+        <div class="customer-card" style="background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                <div>
+                    <h3 style="margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                        ${customer.vip_status ? '⭐' : ''} 
+                        ${escapeHtml(customer.name)}
+                    </h3>
+                    <div style="display: flex; gap: 20px; color: #6B7280; font-size: 14px;">
+                        <span>📞 ${escapeHtml(customer.phone_number)}</span>
+                        ${customer.email ? `<span>✉️ ${escapeHtml(customer.email)}</span>` : ''}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="icon-btn" onclick="editCustomer(${customer.id})" title="Edit">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="icon-btn" onclick="viewCustomerHistory(${customer.id})" title="View Ride History" style="color: #3B82F6;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </button>
+                    <button class="icon-btn" onclick="deleteCustomerConfirm(${customer.id})" title="Delete" style="color: #EF4444;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div style="background: #F9FAFB; padding: 12px; border-radius: 6px;">
+                    <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Total Rides</div>
+                    <div style="font-size: 20px; font-weight: 600; color: #1F2937;">${customer.total_rides || 0}</div>
+                </div>
+                <div style="background: #F9FAFB; padding: 12px; border-radius: 6px;">
+                    <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">Total Spent</div>
+                    <div style="font-size: 20px; font-weight: 600; color: #059669;">$${parseFloat(customer.total_spent || 0).toFixed(2)}</div>
+                </div>
+            </div>
+            
+            ${customer.preferred_pickup_location ? `
+                <div style="background: #FFFBEB; padding: 12px; border-radius: 6px; border-left: 3px solid #F59E0B; margin-bottom: 10px;">
+                    <strong style="font-size: 13px; color: #92400E;">📍 Preferred Pickup:</strong>
+                    <div style="color: #78350F;">${escapeHtml(customer.preferred_pickup_location)}</div>
+                </div>
+            ` : ''}
+            
+            ${customer.notes ? `
+                <div style="background: #EFF6FF; padding: 12px; border-radius: 6px; border-left: 3px solid #3B82F6;">
+                    <strong style="font-size: 13px; color: #1E40AF;">📝 Notes:</strong>
+                    <div style="color: #1E3A8A;">${escapeHtml(customer.notes)}</div>
+                </div>
+            ` : ''}
+            
+            ${customer.last_ride_date ? `
+                <div style="font-size: 13px; color: #9CA3AF; margin-top: 10px;">
+                    Last ride: ${formatDateTime(customer.last_ride_date)}
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
+}
+
+// Update customer stats
+function updateCustomerStats() {
+    const totalCustomersEl = document.getElementById('totalCustomers');
+    const vipCustomersEl = document.getElementById('vipCustomers');
+    
+    if (totalCustomersEl) totalCustomersEl.textContent = allCustomers.length;
+    if (vipCustomersEl) vipCustomersEl.textContent = allCustomers.filter(c => c.vip_status).length;
+}
+
+// Customer search
+document.addEventListener('DOMContentLoaded', function() {
+    const customerSearch = document.getElementById('customerSearch');
+    if (customerSearch) {
+        customerSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            filteredCustomers = allCustomers.filter(customer => 
+                customer.name.toLowerCase().includes(searchTerm) ||
+                customer.phone_number.includes(searchTerm) ||
+                (customer.email && customer.email.toLowerCase().includes(searchTerm))
+            );
+            displayCustomers();
+        });
+    }
+});
+
+// Show add customer form
+function showAddCustomerForm() {
+    const form = document.getElementById('addCustomerForm');
+    if (form) {
+        form.classList.remove('hidden');
+        editingCustomerId = null;
+        
+        // Clear form
+        document.getElementById('customerName').value = '';
+        document.getElementById('customerPhone').value = '';
+        document.getElementById('customerEmail').value = '';
+        document.getElementById('customerPickup').value = '';
+        document.getElementById('customerNotes').value = '';
+        document.getElementById('customerVIP').checked = false;
+    }
+}
+
+// Cancel add customer
+function cancelAddCustomer() {
+    const form = document.getElementById('addCustomerForm');
+    if (form) {
+        form.classList.add('hidden');
+        editingCustomerId = null;
+    }
+}
+
+// Save customer
+async function saveCustomer() {
+    const name = document.getElementById('customerName').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    const email = document.getElementById('customerEmail').value.trim();
+    const pickup = document.getElementById('customerPickup').value.trim();
+    const notes = document.getElementById('customerNotes').value.trim();
+    const vip = document.getElementById('customerVIP').checked;
+    
+    if (!name || !phone) {
+        showNotification('Name and phone number are required', 'error');
+        return;
+    }
+    
+    try {
+        const url = editingCustomerId ? `/api/customers/${editingCustomerId}` : '/api/customers';
+        const method = editingCustomerId ? 'PATCH' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                name,
+                phone_number: phone,
+                email,
+                preferred_pickup_location: pickup,
+                notes,
+                vip_status: vip
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Customer saved successfully', 'success');
+            cancelAddCustomer();
+            loadCustomers();
+        } else {
+            showNotification(result.message || 'Failed to save customer', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving customer:', error);
+        showNotification('Error saving customer', 'error');
+    }
+}
+
+// Edit customer
+async function editCustomer(customerId) {
+    try {
+        const response = await fetch(`/api/customers/${customerId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const customer = result.customer;
+            editingCustomerId = customerId;
+            
+            // Show form
+            const form = document.getElementById('addCustomerForm');
+            form.classList.remove('hidden');
+            
+            // Fill form
+            document.getElementById('customerName').value = customer.name || '';
+            document.getElementById('customerPhone').value = customer.phone_number || '';
+            document.getElementById('customerEmail').value = customer.email || '';
+            document.getElementById('customerPickup').value = customer.preferred_pickup_location || '';
+            document.getElementById('customerNotes').value = customer.notes || '';
+            document.getElementById('customerVIP').checked = customer.vip_status || false;
+            
+            // Scroll to form
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    } catch (error) {
+        console.error('Error loading customer:', error);
+        showNotification('Error loading customer', 'error');
+    }
+}
+
+// View customer ride history
+async function viewCustomerHistory(customerId) {
+    try {
+        const response = await fetch(`/api/customers/${customerId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const customer = result.customer;
+            const rides = result.rideHistory;
+            
+            let message = `Customer: ${customer.name}\n`;
+            message += `Phone: ${customer.phone_number}\n`;
+            message += `Total Rides: ${customer.total_rides}\n`;
+            message += `Total Spent: $${parseFloat(customer.total_spent).toFixed(2)}\n\n`;
+            message += `=== Ride History ===\n\n`;
+            
+            if (rides.length === 0) {
+                message += 'No rides yet';
+            } else {
+                rides.slice(0, 10).forEach((ride, index) => {
+                    message += `${index + 1}. ${formatDate(ride.requested_date)} - ${ride.status}\n`;
+                    message += `   From: ${ride.pickup_location}\n`;
+                    if (ride.service_type !== 'hourly') {
+                        message += `   To: ${ride.dropoff_location}\n`;
+                    }
+                    if (ride.quote_price) {
+                        message += `   Price: $${parseFloat(ride.quote_price).toFixed(2)}\n`;
+                    }
+                    message += '\n';
+                });
+                
+                if (rides.length > 10) {
+                    message += `...and ${rides.length - 10} more rides`;
+                }
+            }
+            
+            alert(message);
+        }
+    } catch (error) {
+        console.error('Error loading customer history:', error);
+        showNotification('Error loading customer history', 'error');
+    }
+}
+
+// Delete customer confirmation
+async function deleteCustomerConfirm(customerId) {
+    const customer = allCustomers.find(c => c.id === customerId);
+    if (!customer) return;
+    
+    if (!confirm(`Delete customer "${customer.name}"?\n\nThis will not delete their ride history, just the customer profile.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/customers/${customerId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Customer deleted successfully', 'success');
+            loadCustomers();
+        } else {
+            showNotification(result.message || 'Failed to delete customer', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting customer:', error);
+        showNotification('Error deleting customer', 'error');
+    }
+}
+
+// Quick add to customers from ride request
+async function quickAddToCustomers(requestId) {
+    const request = allRequests.find(r => r.id === requestId);
+    if (!request) return;
+    
+    try {
+        const response = await fetch('/api/customers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                name: request.name,
+                phone_number: request.phone_number,
+                email: null,
+                preferred_pickup_location: request.pickup_location,
+                notes: null,
+                vip_status: false
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification(`✅ ${request.name} saved to customer database!`, 'success');
+        } else {
+            showNotification(result.message || 'Customer already exists or error occurred', 'info');
+        }
+    } catch (error) {
+        console.error('Error adding customer:', error);
+        showNotification('Error saving to customer database', 'error');
+    }
+}
+
+// Add event listener for customers button
+document.addEventListener('DOMContentLoaded', function() {
+    const customersBtn = document.getElementById('customersBtn');
+    if (customersBtn) {
+        customersBtn.addEventListener('click', openCustomersModal);
+    }
+});
 
 // ======================
 // HOURLY SERVICE FUNCTIONS

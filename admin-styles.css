@@ -600,6 +600,26 @@ html {
     transform: translateY(-1px);
 }
 
+.add-customer-btn {
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    background: #F59E0B;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.add-customer-btn:hover {
+    background: #D97706;
+    transform: translateY(-1px);
+}
+
 .status-badge {
     padding: 6px 12px;
     border-radius: 20px;
@@ -909,7 +929,8 @@ html {
     }
     
     .phone-link,
-    .sms-link {
+    .sms-link,
+    .add-customer-btn {
         width: 100%;
         justify-content: center;
         min-height: 44px;
