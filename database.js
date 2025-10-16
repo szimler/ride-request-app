@@ -99,6 +99,25 @@ async function initializeDatabase() {
     `);
     console.log('✓ Activity logs table ready');
 
+    // Customers table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone_number TEXT UNIQUE NOT NULL,
+        email TEXT,
+        preferred_pickup_location TEXT,
+        notes TEXT,
+        vip_status BOOLEAN DEFAULT FALSE,
+        total_rides INTEGER DEFAULT 0,
+        total_spent DECIMAL(10, 2) DEFAULT 0,
+        last_ride_date TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('✓ Customers table ready');
+
   } catch (err) {
     console.error('Error initializing database:', err);
     throw err;
@@ -396,6 +415,156 @@ function getActivityLogsByRideRequest(rideRequestId) {
   });
 }
 
+// ===========================
+// CUSTOMER FUNCTIONS
+// ===========================
+
+// Create or update customer (upsert based on phone number)
+function upsertCustomer(customerData) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { name, phone_number, email, preferred_pickup_location, notes, vip_status } = customerData;
+      
+      // Check if customer exists
+      const existing = await pool.query('SELECT * FROM customers WHERE phone_number = $1', [phone_number]);
+      
+      if (existing.rows.length > 0) {
+        // Update existing customer
+        const sql = `
+          UPDATE customers 
+          SET name = $1, email = $2, preferred_pickup_location = $3, 
+              notes = $4, vip_status = $5, updated_at = NOW()
+          WHERE phone_number = $6
+          RETURNING *
+        `;
+        const result = await pool.query(sql, [name, email, preferred_pickup_location, notes, vip_status, phone_number]);
+        resolve(result.rows[0]);
+      } else {
+        // Create new customer
+        const sql = `
+          INSERT INTO customers (name, phone_number, email, preferred_pickup_location, notes, vip_status)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING *
+        `;
+        const result = await pool.query(sql, [name, phone_number, email, preferred_pickup_location, notes, vip_status || false]);
+        resolve(result.rows[0]);
+      }
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get all customers
+function getAllCustomers() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('SELECT * FROM customers ORDER BY created_at DESC');
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get customer by phone number
+function getCustomerByPhone(phoneNumber) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('SELECT * FROM customers WHERE phone_number = $1', [phoneNumber]);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get customer by ID
+function getCustomerById(id) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('SELECT * FROM customers WHERE id = $1', [id]);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Update customer
+function updateCustomer(id, updates) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { name, email, preferred_pickup_location, notes, vip_status } = updates;
+      const sql = `
+        UPDATE customers 
+        SET name = $1, email = $2, preferred_pickup_location = $3, 
+            notes = $4, vip_status = $5, updated_at = NOW()
+        WHERE id = $6
+        RETURNING *
+      `;
+      const result = await pool.query(sql, [name, email, preferred_pickup_location, notes, vip_status, id]);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Update customer ride stats (called after ride completion)
+function updateCustomerStats(phoneNumber, ridePrice) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const sql = `
+        UPDATE customers 
+        SET total_rides = total_rides + 1, 
+            total_spent = total_spent + $1, 
+            last_ride_date = NOW(),
+            updated_at = NOW()
+        WHERE phone_number = $2
+        RETURNING *
+      `;
+      const result = await pool.query(sql, [ridePrice || 0, phoneNumber]);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get customer ride history
+function getCustomerRideHistory(customerId) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const customer = await pool.query('SELECT phone_number FROM customers WHERE id = $1', [customerId]);
+      if (customer.rows.length === 0) {
+        resolve([]);
+        return;
+      }
+      
+      const result = await pool.query(
+        'SELECT * FROM ride_requests WHERE phone_number = $1 ORDER BY created_at DESC',
+        [customer.rows[0].phone_number]
+      );
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Delete customer
+function deleteCustomer(id) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('DELETE FROM customers WHERE id = $1 RETURNING *', [id]);
+      resolve({ id, deleted: result.rowCount > 0 });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 module.exports = {
   pool,
   createRideRequest,
@@ -414,5 +583,14 @@ module.exports = {
   createActivityLog,
   getActivityLogs,
   getActivityLogsByUser,
-  getActivityLogsByRideRequest
+  getActivityLogsByRideRequest,
+  // Customer functions
+  upsertCustomer,
+  getAllCustomers,
+  getCustomerByPhone,
+  getCustomerById,
+  updateCustomer,
+  updateCustomerStats,
+  getCustomerRideHistory,
+  deleteCustomer
 };

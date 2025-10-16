@@ -22,7 +22,15 @@ const {
   updateAdminUser,
   updateLastLogin,
   deleteAdminUser,
-  createActivityLog
+  createActivityLog,
+  upsertCustomer,
+  getAllCustomers,
+  getCustomerByPhone,
+  getCustomerById,
+  updateCustomer,
+  updateCustomerStats,
+  getCustomerRideHistory,
+  deleteCustomer
 } = require('./database');
 const { initializeTwilio, sendConfirmationSMS, sendBusinessNotification, sendStatusUpdateSMS, sendDriverNotification } = require('./sms');
 const { getRouteAndPrice } = require('./maps');
@@ -283,6 +291,22 @@ app.post('/api/ride-request', async (req, res) => {
     const rideRequest = await createRideRequest(rideData);
 
     console.log(`✓ New ride request created (ID: ${rideRequest.id})`);
+
+    // Auto-create/update customer record
+    try {
+      await upsertCustomer({
+        name,
+        phone_number,
+        email: null, // Will be added manually by admin if needed
+        preferred_pickup_location: pickup_location,
+        notes: null,
+        vip_status: false
+      });
+      console.log(`✓ Customer record updated for: ${name}`);
+    } catch (customerErr) {
+      console.error('Warning: Could not update customer record:', customerErr);
+      // Don't fail the ride request if customer update fails
+    }
 
     // Broadcast to all connected admins
     broadcastUpdate('new_ride_request', rideRequest);
@@ -587,6 +611,119 @@ app.delete('/api/admin/users/:id', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error deleting user:', err);
     res.status(500).json({ success: false, message: 'Error deleting user' });
+  }
+});
+
+// ===========================
+// CUSTOMER MANAGEMENT ROUTES
+// ===========================
+
+// API: Get all customers
+app.get('/api/customers', authenticateToken, async (req, res) => {
+  try {
+    const customers = await getAllCustomers();
+    res.json({ success: true, customers });
+  } catch (err) {
+    console.error('Error fetching customers:', err);
+    res.status(500).json({ success: false, message: 'Error fetching customers' });
+  }
+});
+
+// API: Get customer by ID with ride history
+app.get('/api/customers/:id', authenticateToken, async (req, res) => {
+  try {
+    const customer = await getCustomerById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+    
+    const rideHistory = await getCustomerRideHistory(req.params.id);
+    res.json({ success: true, customer, rideHistory });
+  } catch (err) {
+    console.error('Error fetching customer:', err);
+    res.status(500).json({ success: false, message: 'Error fetching customer' });
+  }
+});
+
+// API: Create or update customer
+app.post('/api/customers', authenticateToken, async (req, res) => {
+  try {
+    const { name, phone_number, email, preferred_pickup_location, notes, vip_status } = req.body;
+    
+    if (!name || !phone_number) {
+      return res.status(400).json({ success: false, message: 'Name and phone number are required' });
+    }
+    
+    const customer = await upsertCustomer({
+      name,
+      phone_number,
+      email,
+      preferred_pickup_location,
+      notes,
+      vip_status
+    });
+    
+    // Log activity
+    await createActivityLog({
+      user_id: req.user.userId,
+      username: req.user.username,
+      action: 'upsert_customer',
+      target_type: 'customer',
+      target_id: customer.id,
+      details: `Updated customer: ${name}`,
+      ip_address: getUserIP(req)
+    });
+    
+    res.json({ success: true, customer });
+  } catch (err) {
+    console.error('Error upserting customer:', err);
+    res.status(500).json({ success: false, message: 'Error saving customer' });
+  }
+});
+
+// API: Update customer
+app.patch('/api/customers/:id', authenticateToken, async (req, res) => {
+  try {
+    const customer = await updateCustomer(req.params.id, req.body);
+    
+    // Log activity
+    await createActivityLog({
+      user_id: req.user.userId,
+      username: req.user.username,
+      action: 'update_customer',
+      target_type: 'customer',
+      target_id: parseInt(req.params.id),
+      details: `Updated customer details`,
+      ip_address: getUserIP(req)
+    });
+    
+    res.json({ success: true, customer });
+  } catch (err) {
+    console.error('Error updating customer:', err);
+    res.status(500).json({ success: false, message: 'Error updating customer' });
+  }
+});
+
+// API: Delete customer
+app.delete('/api/customers/:id', authenticateToken, async (req, res) => {
+  try {
+    await deleteCustomer(req.params.id);
+    
+    // Log activity
+    await createActivityLog({
+      user_id: req.user.userId,
+      username: req.user.username,
+      action: 'delete_customer',
+      target_type: 'customer',
+      target_id: parseInt(req.params.id),
+      details: `Deleted customer`,
+      ip_address: getUserIP(req)
+    });
+    
+    res.json({ success: true, message: 'Customer deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting customer:', err);
+    res.status(500).json({ success: false, message: 'Error deleting customer' });
   }
 });
 
