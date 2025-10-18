@@ -902,10 +902,8 @@ let audioEnabled = true;
 let audioVolume = 0.5;
 let visualFlashEnabled = true;
 let browserNotificationsEnabled = true;
-let vibrationEnabled = true;
 let soundPattern = 'triple';
 let flashPattern = 'red-pulse';
-let vibrationPattern = 'standard';
 let smsMethod = 'native';
 let skipSmsConfirmation = true;
 let showSmsPreview = false;
@@ -916,10 +914,8 @@ function loadSettings() {
     const savedVolume = localStorage.getItem('audioVolume');
     const savedVisualFlash = localStorage.getItem('visualFlashEnabled');
     const savedBrowserNotifications = localStorage.getItem('browserNotificationsEnabled');
-    const savedVibration = localStorage.getItem('vibrationEnabled');
     const savedSoundPattern = localStorage.getItem('soundPattern');
     const savedFlashPattern = localStorage.getItem('flashPattern');
-    const savedVibrationPattern = localStorage.getItem('vibrationPattern');
     
     if (savedAudioEnabled !== null) {
         audioEnabled = savedAudioEnabled === 'true';
@@ -937,20 +933,12 @@ function loadSettings() {
         browserNotificationsEnabled = savedBrowserNotifications === 'true';
     }
     
-    if (savedVibration !== null) {
-        vibrationEnabled = savedVibration === 'true';
-    }
-    
     if (savedSoundPattern) {
         soundPattern = savedSoundPattern;
     }
     
     if (savedFlashPattern) {
         flashPattern = savedFlashPattern;
-    }
-    
-    if (savedVibrationPattern) {
-        vibrationPattern = savedVibrationPattern;
     }
     
     // Load SMS settings
@@ -976,10 +964,8 @@ function loadSettings() {
     const volumeValue = document.getElementById('volumeValue');
     const visualFlashCheckbox = document.getElementById('visualFlashEnabled');
     const browserNotificationsCheckbox = document.getElementById('browserNotificationsEnabled');
-    const vibrationCheckbox = document.getElementById('vibrationEnabled');
     const soundPatternSelect = document.getElementById('soundPattern');
     const flashPatternSelect = document.getElementById('flashPattern');
-    const vibrationPatternSelect = document.getElementById('vibrationPattern');
     
     if (audioEnabledCheckbox) audioEnabledCheckbox.checked = audioEnabled;
     if (volumeControl) {
@@ -988,10 +974,8 @@ function loadSettings() {
     }
     if (visualFlashCheckbox) visualFlashCheckbox.checked = visualFlashEnabled;
     if (browserNotificationsCheckbox) browserNotificationsCheckbox.checked = browserNotificationsEnabled;
-    if (vibrationCheckbox) vibrationCheckbox.checked = vibrationEnabled;
     if (soundPatternSelect) soundPatternSelect.value = soundPattern;
     if (flashPatternSelect) flashPatternSelect.value = flashPattern;
-    if (vibrationPatternSelect) vibrationPatternSelect.value = vibrationPattern;
     
     // SMS settings
     const smsMethodSelect = document.getElementById('smsMethod');
@@ -1009,10 +993,8 @@ function saveSettings() {
     localStorage.setItem('audioVolume', audioVolume);
     localStorage.setItem('visualFlashEnabled', visualFlashEnabled);
     localStorage.setItem('browserNotificationsEnabled', browserNotificationsEnabled);
-    localStorage.setItem('vibrationEnabled', vibrationEnabled);
     localStorage.setItem('soundPattern', soundPattern);
     localStorage.setItem('flashPattern', flashPattern);
-    localStorage.setItem('vibrationPattern', vibrationPattern);
     localStorage.setItem('smsMethod', smsMethod);
     localStorage.setItem('skipSmsConfirmation', skipSmsConfirmation);
     localStorage.setItem('showSmsPreview', showSmsPreview);
@@ -1127,18 +1109,9 @@ function playSweep(delay, startFreq, endFreq, duration) {
     oscillator.stop(startTime + duration);
 }
 
-// Browser/Phone notification with vibration
+// Browser/Phone notification
 function showBrowserNotification(rideId = null) {
     if (!browserNotificationsEnabled) return;
-    
-    // Try vibration (works on Android, limited on iPhone)
-    if (vibrationEnabled && 'vibrate' in navigator) {
-        try {
-            navigator.vibrate(getVibrationPattern(vibrationPattern));
-        } catch (e) {
-            console.log('Vibration not supported');
-        }
-    }
     
     if ('Notification' in window && Notification.permission === 'granted') {
         const notificationOptions = {
@@ -1150,11 +1123,6 @@ function showBrowserNotification(rideId = null) {
             renotify: true, // Allow duplicate notifications
             silent: false // Play sound
         };
-        
-        // Add vibration if enabled (for Android)
-        if (vibrationEnabled && 'vibrate' in navigator) {
-            notificationOptions.vibrate = getVibrationPattern(vibrationPattern);
-        }
         
         const notification = new Notification('🚕 New Ride Request!', notificationOptions);
         
@@ -1172,24 +1140,6 @@ function showBrowserNotification(rideId = null) {
                 showBrowserNotification(rideId);
             }
         });
-    }
-}
-
-// Get vibration pattern based on selection
-function getVibrationPattern(pattern) {
-    switch(pattern) {
-        case 'standard':
-            return [200, 100, 200, 100, 200]; // Standard 5 pulses
-        case 'sos':
-            return [100, 50, 100, 50, 100, 100, 200, 50, 200, 50, 200, 100, 100, 50, 100, 50, 100]; // SOS: ... --- ...
-        case 'heartbeat':
-            return [100, 50, 150, 200, 100, 50, 150]; // Heartbeat rhythm
-        case 'urgent':
-            return [100, 50, 100, 50, 100, 50, 100, 50, 100, 50, 100]; // Rapid pulses
-        case 'gentle':
-            return [300, 200, 300]; // Gentle long pulses
-        default:
-            return [200, 100, 200, 100, 200];
     }
 }
 
@@ -1811,10 +1761,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const volumeValue = document.getElementById('volumeValue');
     const visualFlashCheckbox = document.getElementById('visualFlashEnabled');
     const browserNotificationsCheckbox = document.getElementById('browserNotificationsEnabled');
-    const vibrationCheckbox = document.getElementById('vibrationEnabled');
     const soundPatternSelect = document.getElementById('soundPattern');
     const flashPatternSelect = document.getElementById('flashPattern');
-    const vibrationPatternSelect = document.getElementById('vibrationPattern');
     
     if (settingsBtn) {
         settingsBtn.addEventListener('click', openSettingsModal);
@@ -1849,13 +1797,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    if (vibrationCheckbox) {
-        vibrationCheckbox.addEventListener('change', function() {
-            vibrationEnabled = this.checked;
-            saveSettings();
-        });
-    }
-    
     if (soundPatternSelect) {
         soundPatternSelect.addEventListener('change', function() {
             soundPattern = this.value;
@@ -1866,13 +1807,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (flashPatternSelect) {
         flashPatternSelect.addEventListener('change', function() {
             flashPattern = this.value;
-            saveSettings();
-        });
-    }
-    
-    if (vibrationPatternSelect) {
-        vibrationPatternSelect.addEventListener('change', function() {
-            vibrationPattern = this.value;
             saveSettings();
         });
     }
@@ -2017,11 +1951,6 @@ function startRepeatingNotification(rideId) {
         if (unacknowledgedRides.has(rideId)) {
             console.log(`Repeating notification for ride ${rideId}`);
             playNotificationSound();
-            
-            // Force vibration on each repeat
-            if (vibrationEnabled && 'vibrate' in navigator) {
-                navigator.vibrate(getVibrationPattern(vibrationPattern));
-            }
             
             // Show persistent notification
             showNotification('⚠️ Pending ride request needs attention!', 'warning');
