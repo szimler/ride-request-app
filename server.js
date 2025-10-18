@@ -15,6 +15,8 @@ const {
   getAllRideRequests, 
   getRideRequestById, 
   updateRideRequestStatus,
+  deleteRideRequest,
+  permanentlyDeleteRideRequest,
   createAdminUser,
   getAdminUserByUsername,
   getAdminUserById,
@@ -201,7 +203,8 @@ app.get('/print-qr', (req, res) => {
 app.get('/api/vcard', (req, res) => {
   const businessName = 'Rider Service - Sebastian';
   const phoneNumber = config.BUSINESS_PHONE_NUMBER || '+17142046318';
-  const website = 'https://ride-request-app.onrender.com';
+  const rideAppUrl = 'https://ride-request-app.onrender.com';
+  const businessCardUrl = 'https://szimler.github.io/business-card';
   
   // Create vCard format (version 3.0)
   const vcard = `BEGIN:VCARD
@@ -209,8 +212,8 @@ VERSION:3.0
 FN:${businessName}
 ORG:${businessName}
 TEL;TYPE=CELL:${phoneNumber}
-URL:${website}
-NOTE:Professional Ride Service - Request a ride anytime at ${website}
+URL:${rideAppUrl}
+NOTE:Professional Ride Service - Tap the website link to request a ride instantly! Business Card: ${businessCardUrl}
 END:VCARD`;
 
   // Set headers for VCF download
@@ -888,6 +891,114 @@ app.patch('/api/ride-requests/:id/status', authenticateToken, async (req, res) =
     res.status(500).json({
       success: false,
       message: 'Error updating status'
+    });
+  }
+});
+
+// API: Delete ride request (soft delete - sets status to "deleted")
+app.delete('/api/ride-requests/:id', authenticateToken, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.id);
+    
+    // Get ride request details before deleting (for logging)
+    const rideRequest = await getRideRequestById(rideId);
+    if (!rideRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ride request not found'
+      });
+    }
+    
+    // Soft delete the ride request (mark as deleted)
+    const result = await deleteRideRequest(rideId);
+    
+    if (result.success) {
+      // Log activity
+      await createActivityLog({
+        user_id: req.user.userId,
+        username: req.user.username,
+        action: 'soft_delete_ride_request',
+        target_type: 'ride_request',
+        target_id: rideId,
+        details: `Moved ride request to deleted status for ${rideRequest.name}`,
+        ip_address: getUserIP(req)
+      });
+      
+      // Broadcast update to all admins
+      broadcastUpdate('ride_request_deleted', { 
+        requestId: rideId, 
+        deletedBy: req.user.username 
+      });
+      
+      res.json({ 
+        success: true, 
+        message: 'Ride request moved to deleted status' 
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: result.message || 'Failed to delete ride request'
+      });
+    }
+  } catch (err) {
+    console.error('Error deleting ride request:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error deleting ride request' 
+    });
+  }
+});
+
+// API: Permanently delete ride request (hard delete - removes from database)
+app.delete('/api/ride-requests/:id/permanent', authenticateToken, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.id);
+    
+    // Get ride request details before deleting (for logging)
+    const rideRequest = await getRideRequestById(rideId);
+    if (!rideRequest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ride request not found'
+      });
+    }
+    
+    // Permanently delete the ride request (remove from database)
+    const result = await permanentlyDeleteRideRequest(rideId);
+    
+    if (result.success) {
+      // Log activity
+      await createActivityLog({
+        user_id: req.user.userId,
+        username: req.user.username,
+        action: 'permanent_delete_ride_request',
+        target_type: 'ride_request',
+        target_id: rideId,
+        details: `Permanently deleted ride request for ${rideRequest.name} (${rideRequest.phone_number})`,
+        ip_address: getUserIP(req)
+      });
+      
+      // Broadcast update to all admins
+      broadcastUpdate('ride_request_permanently_deleted', { 
+        requestId: rideId, 
+        deletedBy: req.user.username 
+      });
+      
+      res.json({ 
+        success: true, 
+        message: 'Ride request permanently deleted from database' 
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: result.message || 'Failed to permanently delete ride request'
+      });
+    }
+  } catch (err) {
+    console.error('Error permanently deleting ride request:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error permanently deleting ride request' 
     });
   }
 });

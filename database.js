@@ -226,6 +226,38 @@ function updateRideRequestStatus(id, status, quotePrice = null, pickupEta = null
   });
 }
 
+// Delete ride request (soft delete - marks as deleted status)
+function deleteRideRequest(id) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('UPDATE ride_requests SET status = $1 WHERE id = $2 RETURNING *', ['deleted', id]);
+      if (result.rows.length > 0) {
+        resolve({ success: true, deletedRequest: result.rows[0] });
+      } else {
+        resolve({ success: false, message: 'Ride request not found' });
+      }
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Permanently delete ride request (hard delete - removes from database completely)
+function permanentlyDeleteRideRequest(id) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('DELETE FROM ride_requests WHERE id = $1 RETURNING *', [id]);
+      if (result.rows.length > 0) {
+        resolve({ success: true, deletedRequest: result.rows[0] });
+      } else {
+        resolve({ success: false, message: 'Ride request not found' });
+      }
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 // ===========================
 // ADMIN USER FUNCTIONS
 // ===========================
@@ -571,6 +603,8 @@ module.exports = {
   getAllRideRequests,
   getRideRequestById,
   updateRideRequestStatus,
+  deleteRideRequest,
+  permanentlyDeleteRideRequest,
   // Admin user functions
   createAdminUser,
   getAdminUserByUsername,
