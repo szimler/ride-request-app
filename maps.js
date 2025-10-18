@@ -96,16 +96,16 @@ function calculatePrice(distanceMiles, durationMinutes) {
 
   if (isShortTrip) {
     // SHORT TRIPS: < 5 miles OR < 7 minutes
-    // $1.50/mile or $0.75/minute (whichever is greater), MINIMUM $6.00
+    // $1.50/mile or $1.25/minute (whichever is greater), MINIMUM $6.00
     const priceByMiles = distanceMiles * 1.50;
-    const priceByTime = durationMinutes * 0.75;
+    const priceByTime = durationMinutes * 1.25;
     
     if (priceByMiles > priceByTime) {
       price = priceByMiles;
       calculation = `${distanceMiles} miles × $1.50 = $${priceByMiles.toFixed(2)}`;
     } else {
       price = priceByTime;
-      calculation = `${durationMinutes} min × $0.75 = $${priceByTime.toFixed(2)}`;
+      calculation = `${durationMinutes} min × $1.25 = $${priceByTime.toFixed(2)}`;
     }
     
     // Enforce minimum of $6.00 for short trips

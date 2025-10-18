@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Print QR Code - Rides CEL</title>
+    <title>Print QR Code - Rider Service - Sebastian</title>
     <style>
         * {
             margin: 0;
@@ -221,7 +221,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Rides CEL - QR Code</h1>
+        <h1>Rider Service - Sebastian - QR Code</h1>
         <p class="subtitle">Print this page for business cards, flyers, and promotional materials</p>
 
         <div class="qr-container">
@@ -234,9 +234,9 @@
         </div>
 
         <div class="contact-info">
-            <h2>Rides CEL</h2>
+            <h2>Rider Service - Sebastian</h2>
             <div class="phone">(714) 204-6318</div>
-            <div class="website" id="websiteUrl">Loading...</div>
+            <div class="website" id="websiteUrl">https://szimler.github.io/business-card</div>
         </div>
 
         <div class="print-buttons">
@@ -279,8 +279,8 @@
     </div>
 
     <script>
-        const currentUrl = window.location.origin;
-        const cardUrl = `${currentUrl}/card`;
+        const currentUrl = 'https://szimler.github.io/business-card';
+        const cardUrl = currentUrl;
         
         // Display website URL
         document.getElementById('websiteUrl').textContent = currentUrl;
@@ -300,7 +300,7 @@
         document.getElementById('downloadQR').addEventListener('click', () => {
             const qrCodeImg = document.getElementById('qrCode');
             const link = document.createElement('a');
-            link.download = 'RidesCEL-QRCode.png';
+            link.download = 'RiderService-Sebastian-QRCode.png';
             link.href = qrCodeImg.src;
             link.click();
         });
@@ -310,4 +310,8 @@
     </script>
 </body>
 </html>
+
+
+
+
 

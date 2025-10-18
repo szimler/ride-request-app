@@ -12,12 +12,25 @@ const timeSelect = document.getElementById('requested_time');
 // Google Maps Autocomplete - Initialize when API loads
 let pickupAutocomplete;
 let dropoffAutocomplete;
+let hourlyPickupAutocomplete;
 
 window.initAutocomplete = function() {
+    console.log('🗺️ initAutocomplete called');
+    
     const pickupInput = document.getElementById('pickup_location');
     const dropoffInput = document.getElementById('dropoff_location');
+    const hourlyPickupInput = document.getElementById('hourly_pickup_location');
     
-    if (!pickupInput || !dropoffInput) return;
+    console.log('Found elements:', {
+        pickupInput: !!pickupInput,
+        dropoffInput: !!dropoffInput,
+        hourlyPickupInput: !!hourlyPickupInput
+    });
+    
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+        console.error('❌ Google Maps API not loaded properly');
+        return;
+    }
     
     // Restrict to Northeast Florida area
     const floridaBounds = new google.maps.LatLngBounds(
@@ -32,13 +45,30 @@ window.initAutocomplete = function() {
         fields: ['formatted_address', 'geometry', 'name']
     };
     
-    // Initialize autocomplete for pickup
+    // Initialize autocomplete for regular ride form
+    if (pickupInput && dropoffInput) {
+        try {
     pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, options);
-    
-    // Initialize autocomplete for dropoff
     dropoffAutocomplete = new google.maps.places.Autocomplete(dropoffInput, options);
+            console.log('✅ Google Maps Autocomplete initialized for regular ride (pickup & dropoff)');
+        } catch (error) {
+            console.error('❌ Error initializing regular ride autocomplete:', error);
+        }
+    } else {
+        console.warn('⚠️ Regular ride form fields not found');
+    }
     
-    console.log('✓ Google Maps Autocomplete initialized');
+    // Initialize autocomplete for hourly ride form
+    if (hourlyPickupInput) {
+        try {
+            hourlyPickupAutocomplete = new google.maps.places.Autocomplete(hourlyPickupInput, options);
+            console.log('✅ Google Maps Autocomplete initialized for hourly ride pickup');
+        } catch (error) {
+            console.error('❌ Error initializing hourly ride autocomplete:', error);
+        }
+    } else {
+        console.warn('⚠️ Hourly ride form pickup field not found (will initialize when form is shown)');
+    }
 };
 
 // Helper function to format date as YYYY-MM-DD
@@ -72,21 +102,22 @@ function formatTimeDisplay(time24) {
     return `${hour12}:${minutes} ${ampm}`;
 }
 
-// Convert dropdown values to actual date/time
+// Convert date input and time dropdown values to actual date/time
 function convertDateTime() {
     const now = new Date();
     let finalDate = '';
     let finalTime = '';
     let displayTime = '';
     
-    // Handle date selection
+    // Handle date selection (now using date input, not dropdown)
     const dateValue = dateSelect.value;
-    if (dateValue === 'today') {
+    if (dateValue) {
+        // If date input has a value (YYYY-MM-DD format), convert to MM/DD/YYYY
+        const dateObj = new Date(dateValue + 'T00:00:00');
+        finalDate = formatDate(dateObj);
+    } else {
+        // Fallback to today if no date selected
         finalDate = formatDate(now);
-    } else if (dateValue === 'tomorrow') {
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        finalDate = formatDate(tomorrow);
     }
     
     // Handle time selection
@@ -297,6 +328,49 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Function to ensure autocomplete is initialized
+function ensureAutocompleteInitialized() {
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+        console.warn('⚠️ Google Maps API not ready yet');
+        return false;
+    }
+    
+    const pickupInput = document.getElementById('pickup_location');
+    const dropoffInput = document.getElementById('dropoff_location');
+    const hourlyPickupInput = document.getElementById('hourly_pickup_location');
+    
+    const floridaBounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(29.5, -82.5),
+        new google.maps.LatLng(30.8, -80.8)
+    );
+    
+    const options = {
+        bounds: floridaBounds,
+        strictBounds: false,
+        componentRestrictions: { country: 'us' },
+        fields: ['formatted_address', 'geometry', 'name']
+    };
+    
+    // Initialize regular form autocomplete if not already done
+    if (pickupInput && !pickupAutocomplete) {
+        pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, options);
+        console.log('✅ Initialized pickup autocomplete');
+    }
+    
+    if (dropoffInput && !dropoffAutocomplete) {
+        dropoffAutocomplete = new google.maps.places.Autocomplete(dropoffInput, options);
+        console.log('✅ Initialized dropoff autocomplete');
+    }
+    
+    // Initialize hourly form autocomplete if not already done
+    if (hourlyPickupInput && !hourlyPickupAutocomplete) {
+        hourlyPickupAutocomplete = new google.maps.places.Autocomplete(hourlyPickupInput, options);
+        console.log('✅ Initialized hourly pickup autocomplete');
+    }
+    
+    return true;
+}
+
 // Service Selection Functionality
 document.addEventListener('DOMContentLoaded', function() {
     const regularRideBtn = document.getElementById('regularRideBtn');
@@ -311,6 +385,9 @@ document.addEventListener('DOMContentLoaded', function() {
             hourlyRideBtn.classList.remove('active');
             regularForm.classList.remove('hidden');
             hourlyForm.classList.add('hidden');
+            
+            // Ensure autocomplete is initialized
+            setTimeout(ensureAutocompleteInitialized, 100);
         });
         
         // Hourly ride button click
@@ -319,8 +396,14 @@ document.addEventListener('DOMContentLoaded', function() {
             regularRideBtn.classList.remove('active');
             hourlyForm.classList.remove('hidden');
             regularForm.classList.add('hidden');
+            
+            // Ensure autocomplete is initialized
+            setTimeout(ensureAutocompleteInitialized, 100);
         });
     }
+    
+    // Try to initialize autocomplete on page load
+    setTimeout(ensureAutocompleteInitialized, 500);
 });
 
 // Hourly Pricing Logic
@@ -410,23 +493,47 @@ document.addEventListener('DOMContentLoaded', function() {
             const btnText = submitBtn.querySelector('.btn-text');
             const btnLoading = submitBtn.querySelector('.btn-loading');
             
+            // Validate required fields
+            const name = document.getElementById('hourly_name').value.trim();
+            const phone = document.getElementById('hourly_phone_number').value.trim();
+            const pickup = document.getElementById('hourly_pickup_location').value.trim();
+            const hours = document.getElementById('hours_needed').value;
+            const startTime = document.getElementById('hourly_start_time').value;
+            const date = document.getElementById('hourly_date').value;
+            
+            // Check for missing fields
+            const missingFields = [];
+            if (!name) missingFields.push('Name');
+            if (!phone) missingFields.push('Phone Number');
+            if (!pickup) missingFields.push('Pickup Location');
+            if (!hours) missingFields.push('Hours Needed');
+            if (!startTime) missingFields.push('Start Time');
+            if (!date) missingFields.push('Date');
+            
+            if (missingFields.length > 0) {
+                const errorMessage = document.getElementById('errorMessage');
+                const errorText = document.getElementById('errorText');
+                errorText.textContent = `Please fill in the following required fields: ${missingFields.join(', ')}`;
+                errorMessage.classList.remove('hidden');
+                errorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            
             // Show loading state
             submitBtn.disabled = true;
             btnText.classList.add('hidden');
             btnLoading.classList.remove('hidden');
             
             // Get form data
-            const hours = document.getElementById('hours_needed').value;
-            const startTime = document.getElementById('hourly_start_time').value;
             const totalPrice = calculateHourlyPrice(hours, startTime);
             
             const formData = {
-                name: document.getElementById('hourly_name').value.trim(),
-                phone_number: document.getElementById('hourly_phone_number').value.replace(/\D/g, ''),
-                pickup_location: document.getElementById('hourly_pickup_location').value.trim(),
+                name: name,
+                phone_number: phone.replace(/\D/g, ''),
+                pickup_location: pickup,
                 hours_needed: hours,
                 start_time: startTime,
-                date: document.getElementById('hourly_date').value,
+                date: date,
                 notes: document.getElementById('hourly_notes').value.trim(),
                 service_type: 'hourly',
                 estimated_total: totalPrice
@@ -486,16 +593,123 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Set minimum date for hourly form
+// Quick Date Button Functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Helper function to format date as YYYY-MM-DD
+    function formatDateForInput(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
+    // Get today and tomorrow dates
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const todayFormatted = formatDateForInput(today);
+    const tomorrowFormatted = formatDateForInput(tomorrow);
+    
+    // Regular Ride Quick Date Buttons
+    const regularDateInput = document.getElementById('requested_date');
+    const regularTodayBtn = document.getElementById('regularTodayBtn');
+    const regularTomorrowBtn = document.getElementById('regularTomorrowBtn');
+    
+    if (regularDateInput && regularDateInput.type === 'date') {
+        // Set minimum date to today
+        regularDateInput.min = todayFormatted;
+        regularDateInput.value = todayFormatted;
+        
+        if (regularTodayBtn) {
+            regularTodayBtn.classList.add('selected');
+            regularTodayBtn.addEventListener('click', function() {
+                regularDateInput.value = todayFormatted;
+                regularTodayBtn.classList.add('selected');
+                regularTomorrowBtn.classList.remove('selected');
+            });
+        }
+        
+        if (regularTomorrowBtn) {
+            regularTomorrowBtn.addEventListener('click', function() {
+                regularDateInput.value = tomorrowFormatted;
+                regularTomorrowBtn.classList.add('selected');
+                regularTodayBtn.classList.remove('selected');
+            });
+        }
+        
+        // Update button selection when date input changes manually
+        regularDateInput.addEventListener('change', function() {
+            if (this.value === todayFormatted) {
+                regularTodayBtn.classList.add('selected');
+                regularTomorrowBtn.classList.remove('selected');
+            } else if (this.value === tomorrowFormatted) {
+                regularTomorrowBtn.classList.add('selected');
+                regularTodayBtn.classList.remove('selected');
+            } else {
+                regularTodayBtn.classList.remove('selected');
+                regularTomorrowBtn.classList.remove('selected');
+            }
+        });
+    }
+    
+    // Hourly Service Quick Date Buttons
     const hourlyDateInput = document.getElementById('hourly_date');
+    const hourlyTodayBtn = document.getElementById('hourlyTodayBtn');
+    const hourlyTomorrowBtn = document.getElementById('hourlyTomorrowBtn');
+    
     if (hourlyDateInput && hourlyDateInput.type === 'date') {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        hourlyDateInput.min = `${year}-${month}-${day}`;
-        hourlyDateInput.value = `${year}-${month}-${day}`;
+        // Set minimum date to today
+        hourlyDateInput.min = todayFormatted;
+        hourlyDateInput.value = todayFormatted;
+        
+        if (hourlyTodayBtn) {
+            hourlyTodayBtn.classList.add('selected');
+            hourlyTodayBtn.addEventListener('click', function() {
+                hourlyDateInput.value = todayFormatted;
+                hourlyTodayBtn.classList.add('selected');
+                hourlyTomorrowBtn.classList.remove('selected');
+            });
+        }
+        
+        if (hourlyTomorrowBtn) {
+            hourlyTomorrowBtn.addEventListener('click', function() {
+                hourlyDateInput.value = tomorrowFormatted;
+                hourlyTomorrowBtn.classList.add('selected');
+                hourlyTodayBtn.classList.remove('selected');
+            });
+        }
+        
+        // Update button selection when date input changes manually
+        hourlyDateInput.addEventListener('change', function() {
+            if (this.value === todayFormatted) {
+                hourlyTodayBtn.classList.add('selected');
+                hourlyTomorrowBtn.classList.remove('selected');
+            } else if (this.value === tomorrowFormatted) {
+                hourlyTomorrowBtn.classList.add('selected');
+                hourlyTodayBtn.classList.remove('selected');
+            } else {
+                hourlyTodayBtn.classList.remove('selected');
+                hourlyTomorrowBtn.classList.remove('selected');
+            }
+        });
+    }
+});
+
+// Request Another Ride Button
+document.addEventListener('DOMContentLoaded', function() {
+    const requestAnotherRideBtn = document.getElementById('requestAnotherRideBtn');
+    const successMessage = document.getElementById('successMessage');
+    const regularForm = document.getElementById('rideRequestForm');
+    const hourlyForm = document.getElementById('hourlyRideForm');
+    const regularRideBtn = document.getElementById('regularRideBtn');
+    const hourlyRideBtn = document.getElementById('hourlyRideBtn');
+    
+    if (requestAnotherRideBtn) {
+        requestAnotherRideBtn.addEventListener('click', function() {
+            // Simple solution: Just reload the page to completely reset everything
+            window.location.reload();
+        });
     }
 });
 

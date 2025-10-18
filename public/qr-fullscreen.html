@@ -43,12 +43,22 @@
         }
 
         #qrcode {
-            display: inline-block;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             padding: 30px;
             background: white;
             border-radius: 20px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
+            margin: 0 auto 30px;
+            max-width: 460px;
+        }
+        
+        #qrImage {
+            width: 100%;
+            height: auto;
+            max-width: 400px;
+            display: block;
         }
 
         .instructions {
@@ -91,15 +101,20 @@
             margin-bottom: 20px;
         }
 
-        /* Mobile optimization - 80% width on phone screens */
+        /* Mobile optimization - better sizing for phones */
         @media (max-width: 640px) {
             .qr-container {
                 width: 100%;
+                padding: 0 20px;
             }
 
             #qrcode {
-                width: 80%;
-                padding: 5%;
+                padding: 20px;
+                max-width: 300px;
+            }
+            
+            #qrImage {
+                max-width: 260px;
             }
 
             h1 {
@@ -109,16 +124,35 @@
             .subtitle {
                 font-size: 16px;
             }
+            
+            .logo {
+                font-size: 40px;
+                margin-bottom: 15px;
+            }
+        }
+        
+        /* Extra small phones */
+        @media (max-width: 375px) {
+            #qrcode {
+                padding: 15px;
+                max-width: 250px;
+            }
+            
+            #qrImage {
+                max-width: 220px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="qr-container">
         <div class="logo">🚕</div>
-        <h1>Sebastian's Ride Service</h1>
+        <h1>Rider Service - Sebastian</h1>
         <p class="subtitle">Scan to Request a Ride</p>
         
-        <div id="qrcode"></div>
+        <div id="qrcode">
+            <img id="qrImage" src="" alt="QR Code">
+        </div>
         
         <p class="instructions">
             📱 Scan this QR code with your phone camera to instantly access the ride request form
@@ -129,98 +163,43 @@
         <button class="download-btn" onclick="downloadQR()">💾 Download QR Code</button>
     </div>
 
-    <!-- QR Code Library -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- QR Code Generation -->
+    <script></script>
     
     <script>
-        // Generate high-resolution QR code
-        const qrContainer = document.getElementById('qrcode');
+        // Generate QR code using API
+        function generateQRCode() {
+            const qrImage = document.getElementById('qrImage');
+            const url = 'https://ride-request-app.onrender.com/';
+            const size = 400;
+            
+            // Using QR Server API
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&format=png&color=1e40af`;
+            
+            qrImage.src = qrUrl;
+            qrImage.onerror = function() {
+                document.getElementById('qrcode').innerHTML = '<p style="color: red;">Error loading QR code. Please refresh the page.</p>';
+            };
+        }
         
-        // Clear any existing content
-        qrContainer.innerHTML = '';
-        
-        // Generate QR code with high quality settings
-        QRCode.toCanvas(document.createElement('canvas'), 'https://ride-request-app.onrender.com/', {
-            width: 400,
-            height: 400,
-            margin: 2,
-            color: {
-                dark: '#1e40af',
-                light: '#ffffff'
-            },
-            errorCorrectionLevel: 'H'
-        }, function (error, canvas) {
-            if (error) {
-                console.error(error);
-                qrContainer.innerHTML = '<p style="color: red;">Error generating QR code</p>';
-            } else {
-                qrContainer.appendChild(canvas);
-            }
-        });
+        // Generate QR code when page loads
+        window.addEventListener('DOMContentLoaded', generateQRCode);
 
         // Function to download QR code as image
         function downloadQR() {
-            const canvas = document.querySelector('#qrcode canvas');
-            if (!canvas) {
-                alert('QR code not generated yet. Please wait a moment and try again.');
+            const qrImage = document.getElementById('qrImage');
+            if (!qrImage || !qrImage.src) {
+                alert('QR code not loaded yet. Please wait a moment and try again.');
                 return;
             }
 
-            // Create a larger canvas with white background and text
-            const finalCanvas = document.createElement('canvas');
-            const ctx = finalCanvas.getContext('2d');
-            
-            // Set dimensions (QR code + padding + text area)
-            finalCanvas.width = 600;
-            finalCanvas.height = 800;
-            
-            // White background
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-            
-            // Add title
-            ctx.fillStyle = '#1e40af';
-            ctx.font = 'bold 36px system-ui';
-            ctx.textAlign = 'center';
-            ctx.fillText('Sebastian\'s Ride Service', 300, 60);
-            
-            // Add car emoji (approximation with text)
-            ctx.font = '48px system-ui';
-            ctx.fillText('🚕', 300, 120);
-            
-            // Add QR code
-            const qrSize = 400;
-            const qrX = (finalCanvas.width - qrSize) / 2;
-            const qrY = 150;
-            ctx.drawImage(canvas, qrX, qrY, qrSize, qrSize);
-            
-            // Add instructions
-            ctx.fillStyle = '#475569';
-            ctx.font = '20px system-ui';
-            ctx.fillText('Scan to Request a Ride', 300, 590);
-            
-            // Add URL
-            ctx.fillStyle = '#1e40af';
-            ctx.font = 'bold 18px system-ui';
-            ctx.fillText('ride-request-app.onrender.com', 300, 630);
-            
-            // Add contact info
-            ctx.fillStyle = '#64748b';
-            ctx.font = '16px system-ui';
-            ctx.fillText('📱 +1 (714) 204-6318', 300, 680);
-            ctx.fillText('Text only while driving for safety', 300, 710);
-            
-            // Download
-            finalCanvas.toBlob(function(blob) {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'Sebastian-Ride-Service-QR-Code.png';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
+            // Create a temporary link to download the QR code
+            const link = document.createElement('a');
+            link.href = qrImage.src;
+            link.download = 'RiderService-Sebastian-QR-Code.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // Instructions for taking screenshot

@@ -26,8 +26,9 @@ module.exports = {
   TWILIO_ACCOUNT_SID: '',         // Skipped - requires A2P registration
   TWILIO_AUTH_TOKEN: '',          // Skipped - requires A2P registration
   TWILIO_PHONE_NUMBER: '',        // Skipped - requires A2P registration
-  BUSINESS_PHONE_NUMBER: '',      // Not needed without Twilio
-  DRIVER_PHONE_NUMBER: '',        // Not needed without Twilio
+  BUSINESS_PHONE_NUMBER: '',      // Admin phone 1 (SMS requires Twilio)
+  BUSINESS_PHONE_NUMBER_2: '+19047700461',  // Admin phone 2
+  DRIVER_PHONE_NUMBER: '+17142046318',      // Driver's phone for pre-quotes and confirmations
   
   
   // ┌─────────────────────────────────────────────────────────┐
