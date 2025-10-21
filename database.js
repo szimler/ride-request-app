@@ -118,6 +118,39 @@ async function initializeDatabase() {
     `);
     console.log('✓ Customers table ready');
 
+    // Driver status table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS driver_status (
+        id SERIAL PRIMARY KEY,
+        is_available BOOLEAN DEFAULT FALSE,
+        schedule_start TEXT,
+        schedule_end TEXT,
+        show_schedule BOOLEAN DEFAULT TRUE,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Ensure there's always one driver status record
+    const driverCheck = await client.query('SELECT COUNT(*) as count FROM driver_status');
+    if (driverCheck.rows[0].count === '0') {
+      await client.query(`
+        INSERT INTO driver_status (is_available, schedule_start, schedule_end, show_schedule)
+        VALUES (FALSE, '08:00', '18:00', TRUE)
+      `);
+    }
+    
+    // Add show_schedule column if it doesn't exist (for existing databases)
+    try {
+      await client.query(`
+        ALTER TABLE driver_status 
+        ADD COLUMN IF NOT EXISTS show_schedule BOOLEAN DEFAULT TRUE
+      `);
+    } catch (err) {
+      // Column might already exist
+    }
+    
+    console.log('✓ Driver status table ready');
+
   } catch (err) {
     console.error('Error initializing database:', err);
     throw err;
@@ -597,6 +630,57 @@ function deleteCustomer(id) {
   });
 }
 
+// ===========================
+// DRIVER STATUS FUNCTIONS
+// ===========================
+
+// Get driver status
+function getDriverStatus() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query('SELECT * FROM driver_status LIMIT 1');
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Update driver status
+function updateDriverStatus(statusData) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { is_available, schedule_start, schedule_end, show_schedule } = statusData;
+      const sql = `
+        UPDATE driver_status 
+        SET is_available = $1, schedule_start = $2, schedule_end = $3, show_schedule = $4, updated_at = NOW()
+        WHERE id = (SELECT id FROM driver_status LIMIT 1)
+        RETURNING *
+      `;
+      const result = await pool.query(sql, [is_available, schedule_start, schedule_end, show_schedule !== undefined ? show_schedule : true]);
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get active confirmed rides for driver
+function getActiveDriverRides() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM ride_requests 
+         WHERE status = 'confirmed' 
+         ORDER BY requested_date ASC, requested_time ASC`
+      );
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 module.exports = {
   pool,
   createRideRequest,
@@ -626,5 +710,9 @@ module.exports = {
   updateCustomer,
   updateCustomerStats,
   getCustomerRideHistory,
-  deleteCustomer
+  deleteCustomer,
+  // Driver status functions
+  getDriverStatus,
+  updateDriverStatus,
+  getActiveDriverRides
 };

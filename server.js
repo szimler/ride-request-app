@@ -32,7 +32,10 @@ const {
   updateCustomer,
   updateCustomerStats,
   getCustomerRideHistory,
-  deleteCustomer
+  deleteCustomer,
+  getDriverStatus,
+  updateDriverStatus,
+  getActiveDriverRides
 } = require('./database');
 const { initializeTwilio, sendConfirmationSMS, sendBusinessNotification, sendStatusUpdateSMS, sendDriverNotification } = require('./sms');
 const { getRouteAndPrice } = require('./maps');
@@ -197,6 +200,11 @@ app.get('/card', (req, res) => {
 // Serve the printable QR code page
 app.get('/print-qr', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'print-qr.html'));
+});
+
+// Serve the driver app
+app.get('/driver', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'driver.html'));
 });
 
 // Generate vCard (VCF file) for contact saving
@@ -1147,6 +1155,81 @@ app.get('/api/admin/backup/download/:filename', authenticateToken, (req, res) =>
   } catch (err) {
     console.error('Error downloading backup:', err);
     res.status(500).json({ success: false, message: 'Error downloading backup' });
+  }
+});
+
+// ===========================
+// DRIVER APP ROUTES
+// ===========================
+
+// Get driver status
+app.get('/api/driver/status', async (req, res) => {
+  try {
+    const status = await getDriverStatus();
+    res.json({ success: true, status });
+  } catch (err) {
+    console.error('Error getting driver status:', err);
+    res.status(500).json({ success: false, message: 'Error getting driver status' });
+  }
+});
+
+// Update driver status
+app.post('/api/driver/status', async (req, res) => {
+  try {
+    const { is_available, schedule_start, schedule_end, show_schedule } = req.body;
+    const status = await updateDriverStatus({ is_available, schedule_start, schedule_end, show_schedule });
+    
+    // Broadcast driver availability update to all connected clients
+    broadcastUpdate('driver_status_updated', status);
+    
+    res.json({ success: true, status });
+  } catch (err) {
+    console.error('Error updating driver status:', err);
+    res.status(500).json({ success: false, message: 'Error updating driver status' });
+  }
+});
+
+// Get active rides (confirmed by admin)
+app.get('/api/driver/active-rides', async (req, res) => {
+  try {
+    const rides = await getActiveDriverRides();
+    res.json({ success: true, rides });
+  } catch (err) {
+    console.error('Error getting active rides:', err);
+    res.status(500).json({ success: false, message: 'Error getting active rides' });
+  }
+});
+
+// Mark ride as completed
+app.post('/api/driver/complete-ride/:id', async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.id);
+    
+    // Get ride details before updating
+    const ride = await getRideRequestById(rideId);
+    if (!ride) {
+      return res.status(404).json({ success: false, message: 'Ride not found' });
+    }
+    
+    // Update status to completed
+    await updateRideRequestStatus(rideId, 'completed');
+    
+    // Update customer stats if ride had a price
+    if (ride.quote_price && ride.phone_number) {
+      await updateCustomerStats(ride.phone_number, ride.quote_price);
+    }
+    
+    // Broadcast update to admin
+    broadcastUpdate('ride_completed_by_driver', {
+      rideId,
+      rideName: ride.name,
+      timestamp: new Date().toISOString()
+    });
+    
+    res.json({ success: true, message: 'Ride marked as completed' });
+  } catch (err) {
+    console.error('Error completing ride:', err);
+    res.status(500).json({ success: false, message: 'Error completing ride' });
   }
 });
 
