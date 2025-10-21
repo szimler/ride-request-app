@@ -9,6 +9,19 @@ const errorText = document.getElementById('errorText');
 const dateSelect = document.getElementById('requested_date');
 const timeSelect = document.getElementById('requested_time');
 
+// Status Button Elements
+let redStatusBtn = document.getElementById('redStatusBtn');
+let greenStatusBtn = document.getElementById('greenStatusBtn');
+
+// Retro Status Box Elements
+let retroStatusText = document.getElementById('retroStatusText');
+let retroStatusTime = document.getElementById('retroStatusTime');
+
+// Old Driver Status Elements (for backwards compatibility, may not exist)
+const driverStatusEl = document.getElementById('driverStatus');
+const statusLight = driverStatusEl?.querySelector('.status-light');
+const statusMessage = driverStatusEl?.querySelector('.status-message');
+
 // Google Maps Autocomplete - Initialize when API loads
 let pickupAutocomplete;
 let dropoffAutocomplete;
@@ -711,6 +724,172 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.reload();
         });
     }
+});
+
+// Driver Availability Status Checker
+async function updateDriverStatus() {
+    console.log('🔍 updateDriverStatus called');
+    console.log('Elements found:', {
+        driverStatusEl: !!driverStatusEl,
+        statusLight: !!statusLight,
+        statusMessage: !!statusMessage,
+        retroStatusText: !!retroStatusText,
+        retroStatusTime: !!retroStatusTime,
+        redStatusBtn: !!redStatusBtn,
+        greenStatusBtn: !!greenStatusBtn
+    });
+
+    try {
+        const response = await fetch('/api/driver/status');
+        console.log('📡 API response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch driver status');
+        }
+
+        const data = await response.json();
+        console.log('📦 API response data:', data);
+
+        if (data.success && data.status) {
+            const { is_available, schedule_start, schedule_end, show_schedule } = data.status;
+
+            // Debug: Log the show_schedule value
+            console.log('Driver status received:', { is_available, show_schedule, schedule_start, schedule_end });
+
+            // Update retro status box
+            if (retroStatusText && retroStatusTime) {
+                if (is_available) {
+                    retroStatusText.textContent = 'ONLINE';
+                    console.log('✅ Set retro status to ONLINE');
+                    
+                    // Show schedule times if enabled
+                    if (show_schedule && schedule_start && schedule_end) {
+                        const startTime = formatTime(schedule_start);
+                        const endTime = formatTime(schedule_end);
+                        retroStatusTime.textContent = `${startTime}-${endTime}`;
+                        console.log('⏰ Set schedule time:', `${startTime}-${endTime}`);
+                    } else {
+                        retroStatusTime.textContent = '';
+                        console.log('⏰ Schedule hidden');
+                    }
+                } else {
+                    retroStatusText.textContent = 'OFFLINE';
+                    console.log('❌ Set retro status to OFFLINE');
+                    
+                    // Show schedule times if enabled
+                    if (show_schedule && schedule_start && schedule_end) {
+                        const startTime = formatTime(schedule_start);
+                        const endTime = formatTime(schedule_end);
+                        retroStatusTime.textContent = `${startTime}-${endTime}`;
+                        console.log('⏰ Set schedule time:', `${startTime}-${endTime}`);
+                    } else {
+                        retroStatusTime.textContent = '';
+                        console.log('⏰ Schedule hidden');
+                    }
+                }
+            } else {
+                console.warn('⚠️ Retro status elements not found!');
+            }
+            
+            // Update status buttons (red/green) - both always fully visible
+            if (redStatusBtn && greenStatusBtn) {
+                if (is_available) {
+                    // Driver available: Green ON, Red OFF (both visible)
+                    greenStatusBtn.src = 'green-on.png';
+                    greenStatusBtn.classList.add('active');
+                    
+                    redStatusBtn.src = 'red-off.png';
+                    redStatusBtn.classList.remove('active');
+                    
+                    console.log('🟢 Set buttons: Green ON, Red OFF');
+                } else {
+                    // Driver unavailable: Red ON, Green OFF (both visible)
+                    redStatusBtn.src = 'red-on.png';
+                    redStatusBtn.classList.add('active');
+                    
+                    greenStatusBtn.src = 'green-off.png';
+                    greenStatusBtn.classList.remove('active');
+                    
+                    console.log('🔴 Set buttons: Red ON, Green OFF');
+                }
+            } else {
+                console.warn('⚠️ Status button elements not found!');
+            }
+            
+            // Update old status indicator (if present)
+            if (statusLight && statusMessage) {
+                statusLight.classList.remove('available', 'unavailable');
+                
+                if (is_available) {
+                    statusLight.classList.add('available');
+                    
+                    // Show schedule times only if enabled
+                    if (show_schedule && schedule_start && schedule_end) {
+                        const startTime = formatTime(schedule_start);
+                        const endTime = formatTime(schedule_end);
+                        statusMessage.textContent = `🟢 Available Now (${startTime} - ${endTime})`;
+                    } else {
+                        statusMessage.textContent = '🟢 Available Now';
+                    }
+                } else {
+                    statusLight.classList.add('unavailable');
+                    
+                    // Show schedule times only if enabled
+                    if (show_schedule && schedule_start && schedule_end) {
+                        const startTime = formatTime(schedule_start);
+                        const endTime = formatTime(schedule_end);
+                        statusMessage.textContent = `🔴 Offline (Available ${startTime} - ${endTime})`;
+                    } else {
+                        statusMessage.textContent = '🔴 Currently Offline';
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching driver status:', err);
+        
+        // Update retro status box
+        if (retroStatusText && retroStatusTime) {
+            retroStatusText.textContent = 'ERROR';
+            retroStatusTime.textContent = '';
+        }
+        
+        // Update old status indicator (if present)
+        if (statusLight && statusMessage) {
+            statusLight.classList.remove('available', 'unavailable');
+            statusMessage.textContent = 'Status unavailable';
+        }
+        
+        // Show both buttons as off in case of error
+        if (redStatusBtn && greenStatusBtn) {
+            redStatusBtn.src = 'red-off.png';
+            redStatusBtn.classList.remove('active', 'inactive');
+            greenStatusBtn.src = 'green-off.png';
+            greenStatusBtn.classList.remove('active', 'inactive');
+        }
+    }
+}
+
+// Format time helper for driver status
+function formatTime(timeString) {
+    if (!timeString) return '';
+    
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+}
+
+// Initialize driver status checker
+document.addEventListener('DOMContentLoaded', function() {
+    // Initial check
+    updateDriverStatus();
+    
+    // Update every 10 seconds
+    setInterval(updateDriverStatus, 10000);
+    
+    console.log('✓ Driver status checker initialized');
 });
 
 // Log app initialization

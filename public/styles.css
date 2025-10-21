@@ -60,6 +60,7 @@ body {
     color: var(--white);
     padding: 30px 30px 20px 30px;
     text-align: center;
+    position: relative;
 }
 
 .logo {
@@ -67,7 +68,8 @@ body {
     align-items: center;
     justify-content: center;
     gap: 15px;
-    margin-bottom: 10px;
+    margin-bottom: 25px;
+    padding-top: 10px;
 }
 
 .logo svg {
@@ -87,6 +89,119 @@ body {
     opacity: 0.95;
     font-weight: 400;
     margin-bottom: 0;
+}
+
+/* Driver Status Display (Top - Above Title) */
+.driver-status-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0 0 18px 0;
+}
+
+/* Retro Computer-Style Status Box */
+.retro-status-box {
+    background: #000000;
+    border: 2px solid #ffffff;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-family: 'Courier New', Courier, monospace;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    min-width: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.retro-status-text {
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #33ff33;
+    text-shadow: 0 0 4px #33ff33;
+    margin: 0;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.retro-status-time {
+    font-size: 13px;
+    color: #33ff33;
+    text-shadow: 0 0 3px #33ff33;
+    margin: 0;
+    line-height: 1.2;
+    opacity: 0.95;
+    white-space: nowrap;
+}
+
+.retro-status-time:empty {
+    display: none;
+}
+
+/* Status Buttons (removed - now inline in HTML) */
+
+.status-btn {
+    width: 32px;
+    height: 32px;
+    cursor: default;
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    opacity: 1;
+}
+
+.status-btn.active {
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+    transform: scale(1.05);
+}
+
+/* Driver Availability Status Indicator */
+.driver-status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 15px 0 10px 0;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.status-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #9CA3AF;
+    animation: pulse-status 2s infinite;
+    box-shadow: 0 0 0 0 rgba(156, 163, 175, 0.5);
+}
+
+.status-light.available {
+    background: #10B981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.status-light.unavailable {
+    background: #EF4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+@keyframes pulse-status {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.status-message {
+    color: white;
+    font-weight: 600;
 }
 
 /* Driver Introduction Section */
@@ -869,6 +984,32 @@ textarea::placeholder {
     
     .price-display h3 {
         font-size: 18px;
+    }
+    
+    /* Status display responsive */
+    .driver-status-display {
+        gap: 8px;
+        margin: 10px 0 8px 0;
+    }
+    
+    .retro-status-box {
+        min-width: 240px;
+        padding: 5px 10px;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .retro-status-text {
+        font-size: 12px;
+    }
+    
+    .retro-status-time {
+        font-size: 11px;
+    }
+    
+    .status-btn {
+        width: 28px;
+        height: 28px;
     }
 }
 
