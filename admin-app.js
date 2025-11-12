@@ -20,10 +20,191 @@ const searchInput = document.getElementById('searchInput');
 const statusFilter = document.getElementById('statusFilter');
 const sortFilter = document.getElementById('sortFilter');
 
+// Siren alert elements
+const sirenAlert = document.getElementById('sirenAlert');
+const sirenVideo = document.getElementById('sirenVideo');
+const notificationSound = document.getElementById('notificationSound');
+const alertSoundBackup = document.getElementById('alertSoundBackup');
+
+// Audio Context for generating alert tones
+let audioContext;
+let audioUnlocked = false;
+
 // Stats elements
 const totalRequestsEl = document.getElementById('totalRequests');
 const pendingRequestsEl = document.getElementById('pendingRequests');
 const todayRequestsEl = document.getElementById('todayRequests');
+
+// ===========================
+// SIREN NOTIFICATION SYSTEM
+// ===========================
+
+// Initialize Audio Context
+function initAudioContext() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        console.log('✓ Audio context created for admin');
+    }
+    return audioContext;
+}
+
+// Generate loud alert tone
+function playAlertTone(duration = 3000) {
+    const ctx = initAudioContext();
+    
+    if (ctx.state === 'suspended') {
+        ctx.resume();
+    }
+    
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    // Create alternating siren sound (850Hz and 950Hz)
+    oscillator.frequency.setValueAtTime(850, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(950, ctx.currentTime + 0.25);
+    oscillator.frequency.setValueAtTime(850, ctx.currentTime + 0.5);
+    oscillator.frequency.setValueAtTime(950, ctx.currentTime + 0.75);
+    oscillator.frequency.setValueAtTime(850, ctx.currentTime + 1.0);
+    oscillator.frequency.setValueAtTime(950, ctx.currentTime + 1.25);
+    oscillator.frequency.setValueAtTime(850, ctx.currentTime + 1.5);
+    oscillator.frequency.setValueAtTime(950, ctx.currentTime + 1.75);
+    oscillator.frequency.setValueAtTime(850, ctx.currentTime + 2.0);
+    oscillator.frequency.setValueAtTime(950, ctx.currentTime + 2.25);
+    oscillator.frequency.setValueAtTime(850, ctx.currentTime + 2.5);
+    oscillator.frequency.setValueAtTime(950, ctx.currentTime + 2.75);
+    
+    oscillator.type = 'sine';
+    
+    const volume = 0.3; // 30% volume to avoid distortion
+    gainNode.gain.setValueAtTime(volume, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration / 1000);
+    
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + duration / 1000);
+    
+    console.log('✓ Admin alert tone playing');
+}
+
+// Unlock audio on user interaction
+function unlockAudio() {
+    if (!audioUnlocked) {
+        initAudioContext();
+        
+        const sounds = [notificationSound, alertSoundBackup];
+        sounds.forEach(sound => {
+            if (sound) {
+                sound.volume = 0.01;
+                sound.play().then(() => {
+                    sound.pause();
+                    sound.currentTime = 0;
+                    sound.volume = 1;
+                }).catch(() => {});
+            }
+        });
+        
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        
+        audioUnlocked = true;
+        console.log('✓ Admin audio unlocked');
+    }
+}
+
+// Unlock audio on user interaction
+document.addEventListener('click', unlockAudio);
+document.addEventListener('touchstart', unlockAudio);
+
+// Trigger siren alert for new ride
+async function triggerSirenAlert(rideRequest) {
+    console.log('🚨 Triggering siren for new ride:', rideRequest.name);
+
+    // Show fullscreen siren
+    if (sirenAlert && sirenVideo) {
+        sirenAlert.classList.remove('hidden');
+        sirenVideo.play().catch(err => console.log('Video play blocked:', err));
+    }
+
+    // Play LOUD alert sounds
+    try {
+        // Force audio context resume
+        if (audioContext && audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+        
+        // Web Audio API tone
+        playAlertTone(3000);
+        
+        // Backup embedded sound
+        if (alertSoundBackup) {
+            alertSoundBackup.volume = 0.9;
+            alertSoundBackup.loop = true;
+            
+            const playPromise = alertSoundBackup.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => console.log('✓ Admin alert sound playing'))
+                    .catch((err) => console.error('Mobile audio blocked:', err));
+            }
+            
+            setTimeout(() => {
+                alertSoundBackup.pause();
+                alertSoundBackup.currentTime = 0;
+                alertSoundBackup.loop = false;
+            }, 3000);
+        }
+    } catch (err) {
+        console.error('Error playing admin alert sound:', err);
+    }
+
+    // Trigger vibration (if on mobile)
+    if ('vibrate' in navigator) {
+        navigator.vibrate([200, 100, 200, 100, 200, 100, 200, 100, 200]);
+    }
+
+    // Browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🚨 New Ride Request', {
+            body: `${rideRequest.name} - ${rideRequest.pickup_location}`,
+            icon: '/qr-code.png',
+            vibrate: [200, 100, 200, 100, 200],
+            requireInteraction: true
+        });
+    }
+}
+
+// Dismiss siren
+function dismissSiren() {
+    if (sirenAlert) {
+        sirenAlert.classList.add('hidden');
+    }
+    
+    if (sirenVideo) {
+        sirenVideo.pause();
+        sirenVideo.currentTime = 0;
+    }
+    
+    if (alertSoundBackup) {
+        alertSoundBackup.pause();
+        alertSoundBackup.currentTime = 0;
+        alertSoundBackup.loop = false;
+    }
+    
+    console.log('✓ Admin siren dismissed');
+}
+
+// Siren overlay - dismiss on touch/click
+if (sirenAlert) {
+    sirenAlert.addEventListener('click', dismissSiren);
+}
+
+// Request notification permission
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+}
 
 // Check for saved token and auto-login
 const savedToken = localStorage.getItem('adminToken');
@@ -219,7 +400,20 @@ function connectWebSocket() {
     
     // Real-time ride request updates
     socket.on('new_ride_request', (request) => {
-        console.log('New ride request:', request);
+        console.log('🚨 New ride request received via WebSocket:', request);
+        console.log('📍 Siren elements check:', {
+            sirenAlert: !!sirenAlert,
+            sirenVideo: !!sirenVideo,
+            alertSoundBackup: !!alertSoundBackup
+        });
+        
+        // Trigger fullscreen siren alert
+        try {
+            triggerSirenAlert(request);
+            console.log('✅ triggerSirenAlert called successfully');
+        } catch (err) {
+            console.error('❌ Error triggering siren:', err);
+        }
         
         // Start repeating notification for this new ride
         startRepeatingNotification(request.id);
@@ -897,7 +1091,7 @@ document.head.appendChild(style);
 // AUDIO NOTIFICATIONS
 // ============================================
 
-let audioContext = null;
+// audioContext already declared at top of file
 let audioEnabled = true;
 let audioVolume = 0.5;
 let visualFlashEnabled = true;
