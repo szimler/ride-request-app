@@ -498,3 +498,121 @@ body {
     }
 }
 
+/* ===========================
+   DARK MODE - SYSTEM PREFERENCE
+   =========================== */
+
+@media (prefers-color-scheme: dark) {
+    body {
+        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+    }
+
+    .driver-container {
+        background: #1F2937;
+        color: #F3F4F6;
+    }
+
+    /* Header */
+    .driver-header {
+        background: linear-gradient(135deg, #4338CA 0%, #6366F1 100%);
+    }
+
+    /* Sections */
+    .schedule-section,
+    .settings-section,
+    .rides-section {
+        border-bottom-color: #374151;
+    }
+
+    .schedule-section h2,
+    .settings-section h2,
+    .rides-section h2 {
+        color: #F3F4F6;
+    }
+
+    /* Schedule */
+    .current-schedule {
+        background: #1E3A5F;
+        border-left-color: #6366F1;
+        color: #E5E7EB;
+    }
+
+    .schedule-visibility {
+        background: #3F2F1E;
+        border-left-color: #FBBF24;
+    }
+
+    .visibility-note {
+        color: #9CA3AF;
+    }
+
+    /* Settings */
+    .setting-item {
+        background: #111827;
+        border-color: #374151;
+        color: #F3F4F6;
+    }
+
+    /* Inputs */
+    input[type="time"],
+    select {
+        background: #0F172A;
+        border-color: #374151;
+        color: #F3F4F6;
+    }
+
+    input[type="time"]:focus,
+    select:focus {
+        border-color: #6366F1;
+        background: #1F2937;
+    }
+
+    /* Ride Cards */
+    .ride-card {
+        background: #1F2937;
+        border-color: #6366F1;
+    }
+
+    .ride-card:hover {
+        background: #252F3F;
+    }
+
+    .ride-header {
+        border-bottom-color: #374151;
+    }
+
+    .ride-id {
+        color: #818CF8;
+    }
+
+    .ride-time,
+    .detail-label,
+    .detail-value {
+        color: #E5E7EB;
+    }
+
+    .ride-price {
+        background: #064E3B;
+        color: #34D399;
+    }
+
+    .no-rides {
+        color: #6B7280;
+    }
+
+    /* Connection Status */
+    .connection-status {
+        background: #111827;
+        color: #9CA3AF;
+    }
+
+    /* Buttons retain their colors for visibility */
+    .btn-complete {
+        background: #059669;
+    }
+
+    .btn-complete:hover {
+        background: #047857;
+    }
+}
+

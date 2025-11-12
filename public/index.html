@@ -166,15 +166,20 @@
                         </svg>
                         Pickup Location
                     </label>
-                    <input 
-                        type="text" 
-                        id="pickup_location" 
-                        name="pickup_location" 
-                        placeholder="Start typing address... (e.g., 123 Main St, Jacksonville)" 
-                        required
-                        autocomplete="off"
-                    >
-                    <small class="field-hint">Start typing and select from suggestions</small>
+                    <div class="input-with-button">
+                        <input 
+                            type="text" 
+                            id="pickup_location" 
+                            name="pickup_location" 
+                            placeholder="Start typing address... (e.g., 123 Main St, Jacksonville)" 
+                            required
+                            autocomplete="off"
+                        >
+                        <button type="button" class="location-btn" id="useCurrentLocationBtn" title="Use my current location">
+                            📍
+                        </button>
+                    </div>
+                    <small class="field-hint">Start typing and select from suggestions, or click 📍 to use your current location</small>
                 </div>
 
                 <div class="form-group">

@@ -897,6 +897,94 @@ function formatTime(timeString) {
     return `${hour12}:${minutes} ${ampm}`;
 }
 
+// Use Current Location Feature
+const useCurrentLocationBtn = document.getElementById('useCurrentLocationBtn');
+
+if (useCurrentLocationBtn) {
+    useCurrentLocationBtn.addEventListener('click', async function() {
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser');
+            return;
+        }
+
+        // Show loading state
+        useCurrentLocationBtn.disabled = true;
+        useCurrentLocationBtn.classList.add('loading');
+        const originalText = useCurrentLocationBtn.textContent;
+        useCurrentLocationBtn.textContent = '⌛';
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                
+                console.log('📍 Current location:', lat, lng);
+
+                // Reverse geocode using Google Maps
+                if (window.google && window.google.maps) {
+                    const geocoder = new google.maps.Geocoder();
+                    const latlng = { lat, lng };
+
+                    geocoder.geocode({ location: latlng }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            const address = results[0].formatted_address;
+                            document.getElementById('pickup_location').value = address;
+                            console.log('✓ Address found:', address);
+                            
+                            // Show success feedback
+                            useCurrentLocationBtn.textContent = '✓';
+                            setTimeout(() => {
+                                useCurrentLocationBtn.textContent = originalText;
+                                useCurrentLocationBtn.disabled = false;
+                                useCurrentLocationBtn.classList.remove('loading');
+                            }, 2000);
+                        } else {
+                            console.error('Geocoder failed:', status);
+                            alert('Could not determine address from your location');
+                            useCurrentLocationBtn.textContent = originalText;
+                            useCurrentLocationBtn.disabled = false;
+                            useCurrentLocationBtn.classList.remove('loading');
+                        }
+                    });
+                } else {
+                    alert('Google Maps not loaded. Please type your address manually.');
+                    useCurrentLocationBtn.textContent = originalText;
+                    useCurrentLocationBtn.disabled = false;
+                    useCurrentLocationBtn.classList.remove('loading');
+                }
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                let errorMsg = 'Could not get your location. ';
+                
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMsg += 'Please allow location access in your browser settings.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMsg += 'Location information unavailable.';
+                        break;
+                    case error.TIMEOUT:
+                        errorMsg += 'Location request timed out.';
+                        break;
+                    default:
+                        errorMsg += 'Unknown error occurred.';
+                }
+                
+                alert(errorMsg);
+                useCurrentLocationBtn.textContent = originalText;
+                useCurrentLocationBtn.disabled = false;
+                useCurrentLocationBtn.classList.remove('loading');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    });
+}
+
 // Initialize driver status checker
 document.addEventListener('DOMContentLoaded', function() {
     // Initial check
