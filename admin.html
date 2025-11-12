@@ -794,6 +794,23 @@
         </div>
     </div>
 
+    <!-- Fullscreen Siren Alert for New Ride Requests (Hidden by default) -->
+    <div id="sirenAlert" class="siren-overlay hidden">
+        <video id="sirenVideo" loop muted playsinline>
+            <source src="siren-green.mp4" type="video/mp4">
+        </video>
+        <div class="alert-text">
+            <h1>🚨 NEW RIDE REQUEST 🚨</h1>
+            <p>Tap anywhere to acknowledge</p>
+        </div>
+    </div>
+
+    <!-- Audio elements for notification sounds -->
+    <audio id="notificationSound" preload="auto"></audio>
+    <audio id="alertSoundBackup" preload="auto" loop>
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjGH0fPTgjMGHWu/7+OZSA0PVqzn77BdGAg+ltryxnMpBSh+zPLaizsIGGS57OihUBELTKXh8bllHAU2jdXzzn0vBSF1xe/glEILElyx6OyrWBUIQ5zd8sFuJAYuhM/z1YU2Bhxqvu7mnEoOD1ap5vCzYBoGPJPY88p2KwUme8rx3I4+CRZiturqpVITC0mi4PK8aB8GM4nU887+LgYif8vx2Ys5CBdnvO3om04MDlas5vC1YRsGO5DX8sh0LAUofsrx2448CRhhu+vrpVMSDEql4fK6aB4GMYfS89GAPggeb8Xu45ZECw9Zre3wt2IdCT+W2fHAdC0GKoHO89WHNwgZZ7vs6J9NEAxOpOLyt2QdBTeO1fPPgDEFFnLB79yMOwkWX7bp7KlUEgtLpOHxuWceBjSJ1PPOey4FIXnG79+RQQsQWK/m7rdmHQc9ldrxwHMpBSl/y/HYijcIF2a76+aiUBELTKLg8bxoHwYxh9Dzz34uBSBzw+7dlEMLEVeu5u+2Yx0IPpXX8L1xJwUofMrx1oY1Bhpnuerpo1ISC0qh4PG7aR4GMojT89CDMQUWccLu3pBBCw9XrubvtWMdBzyU2PHBcSYFJ3vJ8deLOQgYY7ro6qZTEgxKoeHzv2kfBjOIz/PQgC8FFm+/7tyPPwkPVq3m7rdjHQc9lNjwwG8nBSZ5yPHWiTgHGGK56OmkUhIMSZ/g8bpoIAY0iNDzzYEwBRVuwu7dlEALD1et5u+1Yx0HPJLa8L5vJwQne8jx1oo4CBdiu+bqpFQTDEqh4PO8aB8GM4nP8tB+MAUVb8Hu3I9ACg9Wrebut2MdBz2T2PCgcCcFJ3rI8deLOQgYYbrn6qNTEwxKn+DyvGgfBjKJ0PPOgS8EFnDB7t2SQAsOV63n77VjHQc8lNjwvnAnBCd7yPHWizkIF2K65+qkUxMMSqHg8rtoHwYziNDzzn8wBRZvwe7djkAJD1at5u62Yx0HPJPa8L5vJgQne8nx1oo5CBdiuebrpFQTC0mf4PK8aR8GM4jQ886AMAUWM=" type="audio/wav">
+    </audio>
+
     <script src="admin-app.js"></script>
     <script src="admin-backup-functions.js"></script>
 </body>
