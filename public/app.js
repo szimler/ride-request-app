@@ -103,11 +103,16 @@ function formatTime(date) {
 function addMinutes(minutes) {
     const now = new Date();
     now.setMinutes(now.getMinutes() + minutes);
-    return now;
+    // Return time string in HH:MM format
+    const hours = String(now.getHours()).padStart(2, '0');
+    const mins = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${mins}`;
 }
 
 // Helper function to format time for display (12-hour format)
 function formatTimeDisplay(time24) {
+    if (!time24 || typeof time24 !== 'string') return '';
+    
     const [hours, minutes] = time24.split(':');
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -136,19 +141,19 @@ function convertDateTime() {
     // Handle time selection
     const timeValue = timeSelect.value;
     if (timeValue === 'asap') {
-        finalTime = formatTime(now);
+        // Get current time as HH:MM string
+        const hours = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        finalTime = `${hours}:${mins}`;
         displayTime = 'ASAP';
     } else if (timeValue === '15min') {
-        const futureTime = addMinutes(15);
-        finalTime = formatTime(futureTime);
+        finalTime = addMinutes(15);
         displayTime = 'In 15 minutes';
     } else if (timeValue === '30min') {
-        const futureTime = addMinutes(30);
-        finalTime = formatTime(futureTime);
+        finalTime = addMinutes(30);
         displayTime = 'In 30 minutes';
     } else if (timeValue === '1hour') {
-        const futureTime = addMinutes(60);
-        finalTime = formatTime(futureTime);
+        finalTime = addMinutes(60);
         displayTime = 'In 1 hour';
     } else {
         // It's a specific time like "14:00"
@@ -872,9 +877,20 @@ async function updateDriverStatus() {
 
 // Format time helper for driver status
 function formatTime(timeString) {
+    // Safety checks
     if (!timeString) return '';
+    if (typeof timeString !== 'string') {
+        console.error('formatTime expected string, got:', typeof timeString, timeString);
+        return '';
+    }
     
-    const [hours, minutes] = timeString.split(':');
+    const parts = timeString.split(':');
+    if (parts.length !== 2) {
+        console.error('Invalid time format:', timeString);
+        return timeString; // Return as-is if format is unexpected
+    }
+    
+    const [hours, minutes] = parts;
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const hour12 = hour % 12 || 12;

@@ -98,25 +98,41 @@ function unlockAudio() {
     if (!audioUnlocked) {
         initAudioContext();
         
-        // Try to play and pause to unlock
+        // Try to play and pause to unlock (mobile requirement)
         const sounds = [notificationSound, alertSoundBackup];
         sounds.forEach(sound => {
             if (sound) {
+                sound.volume = 0.01; // Very quiet test
                 sound.play().then(() => {
                     sound.pause();
                     sound.currentTime = 0;
+                    sound.volume = 1; // Reset to full
                 }).catch(() => {});
             }
         });
         
+        // Also unlock audio context
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        
         audioUnlocked = true;
-        console.log('✓ Audio unlocked');
+        console.log('✓ Audio unlocked for mobile');
+        showToast('Sound ready! 🔊', 'success');
     }
 }
 
-// Unlock audio on any user interaction
-document.addEventListener('click', unlockAudio, { once: true });
-document.addEventListener('touchstart', unlockAudio, { once: true });
+// Unlock audio on ANY user interaction (important for mobile)
+document.addEventListener('click', unlockAudio);
+document.addEventListener('touchstart', unlockAudio);
+document.addEventListener('touchend', unlockAudio);
+
+// Also try to unlock when page becomes visible
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !audioUnlocked) {
+        unlockAudio();
+    }
+});
 
 // Vibration patterns
 const vibrationPatterns = {
@@ -299,20 +315,38 @@ async function triggerNotification(rideName) {
     // Play video (visual only - no audio in this video)
     sirenVideo.play().catch(err => console.log('Video play blocked:', err));
 
-    // Play LOUD alert sounds
+    // Play LOUD alert sounds (mobile optimized)
     if (driverState.soundEnabled) {
+        // Force audio context resume (mobile Safari requirement)
+        if (audioContext && audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+        
         // Method 1: Web Audio API tone (most reliable and LOUD)
         try {
             playAlertTone(3000); // 3 second alert tone
+            console.log('✓ Alert tone triggered');
         } catch (err) {
             console.error('Error playing alert tone:', err);
         }
         
-        // Method 2: Backup embedded sound
+        // Method 2: Backup embedded sound (works on most mobile browsers)
         try {
-            alertSoundBackup.volume = driverState.volume / 100;
+            alertSoundBackup.volume = Math.max(0.8, driverState.volume / 100); // At least 80% volume
             alertSoundBackup.loop = true;
-            await alertSoundBackup.play();
+            
+            const playPromise = alertSoundBackup.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        console.log('✓ Backup alert sound playing');
+                    })
+                    .catch((err) => {
+                        console.error('Mobile audio blocked:', err);
+                        // Show visual warning if sound fails
+                        showToast('🔇 Sound blocked! Tap screen first', 'warning');
+                    });
+            }
             
             // Stop backup sound after 3 seconds
             setTimeout(() => {
@@ -321,7 +355,6 @@ async function triggerNotification(rideName) {
                 alertSoundBackup.loop = false;
             }, 3000);
             
-            console.log('✓ Backup alert sound playing');
         } catch (err) {
             console.error('Error playing backup sound:', err);
         }
