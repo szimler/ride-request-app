@@ -896,6 +896,11 @@ async function updateStatus(requestId, newStatus, quotePrice = null, pickupEta =
         const result = await response.json();
         
         if (result.success) {
+            // Stop repeating notifications when status changes from pending
+            if (status !== 'pending') {
+                acknowledgeRide(requestId);
+            }
+            
             // Show success feedback
             showNotification(`Status updated successfully! ${result.smsStatus?.success ? 'SMS sent to customer.' : ''}`, 'success');
             
@@ -2763,6 +2768,10 @@ Thank you for your understanding!`;
                 },
                 body: JSON.stringify({ status: 'not_available' })
             });
+            
+            // Stop repeating notifications
+            acknowledgeRide(requestId);
+            
             loadRideRequests();
         } catch (error) {
             console.error('Error updating status:', error);
@@ -3509,6 +3518,9 @@ async function confirmHourlyBooking(requestId) {
         const result = await response.json();
         
         if (result.success) {
+            // Stop repeating notifications
+            acknowledgeRide(requestId);
+            
             showNotification('Hourly booking confirmed! SMS sent to customer and driver.', 'success');
             await loadRideRequests();
         } else {
@@ -3545,6 +3557,9 @@ async function declineHourlyBooking(requestId) {
         const result = await response.json();
         
         if (result.success) {
+            // Stop repeating notifications
+            acknowledgeRide(requestId);
+            
             showNotification('Booking declined. SMS sent to customer.', 'success');
             await loadRideRequests();
         } else {
@@ -3578,6 +3593,9 @@ async function deleteRideRequest(requestId) {
             const result = await response.json();
             
             if (result.success) {
+                // Stop repeating notifications for this ride
+                acknowledgeRide(requestId);
+                
                 showNotification('Ride permanently deleted from database', 'success');
                 await loadRideRequests();
             } else {
@@ -3600,6 +3618,9 @@ async function deleteRideRequest(requestId) {
             const result = await response.json();
             
             if (result.success) {
+                // Stop repeating notifications for this ride
+                acknowledgeRide(requestId);
+                
                 showNotification(`Ride moved to deleted (view in "Deleted" filter)`, 'success');
                 await loadRideRequests();
             } else {
