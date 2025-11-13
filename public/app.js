@@ -983,25 +983,28 @@ async function loadLEDMessage() {
             const direction = msg.direction || 'left';
             const scrollSpeed = parseFloat(msg.scroll_speed || msg.scrollSpeed || 0.3);
             const pauseDuration = parseInt(msg.pause_duration || msg.pauseDuration || 3000);
+            const textColor = msg.textColor || '#00FF00';
+            const bgColor = msg.bgColor || '#000000';
+            const colorMode = msg.colorMode || 'solid';
             
-            console.log('📥 Loading LED from API:', { text, direction, scrollSpeed, pauseDuration });
+            console.log('📥 Loading LED from API:', { text, direction, scrollSpeed, pauseDuration, textColor, bgColor, colorMode });
             
             // Set speed and pause before message
             window.ledMatrix.setSpeed(scrollSpeed);
             window.ledMatrix.setPauseDuration(pauseDuration);
             
-            // Always use horizontal mode with direction control
-            window.ledMatrix.setMessage(text, 'horizontal', 'rainbow', direction);
+            // Use proper color mode and colors
+            window.ledMatrix.setMessage(text, 'horizontal', colorMode, direction, textColor, bgColor);
             
-            console.log('✓ LED message loaded from admin settings with direction:', direction);
+            console.log('✓ LED message loaded from admin settings with direction:', direction, 'colors:', textColor, bgColor);
         }
     } catch (error) {
         console.error('Error loading LED message:', error);
-        // Fallback to default with SLOW speed (0.1x) and proper scrolling
+        // Fallback to default with 0.5x speed and green color
         if (window.ledMatrix) {
-            window.ledMatrix.setSpeed(0.1);
+            window.ledMatrix.setSpeed(0.5);
             window.ledMatrix.setPauseDuration(2000);
-            window.ledMatrix.setMessage('DRIVER AVAILABLE - BOOK NOW ON THE APP', 'horizontal', 'rainbow', 'left');
+            window.ledMatrix.setMessage('DRIVER AVAILABLE - BOOK NOW ON THE APP', 'horizontal', 'solid', 'left', '#00FF00', '#000000');
         }
     }
 }
