@@ -1365,8 +1365,11 @@ app.get('/api/led-sign/current', async (req, res) => {
           text: message.message,
           scrollMode: message.scroll_mode,
           direction: message.direction || 'left',
-          scrollSpeed: message.scroll_speed || 0.1,
+          scrollSpeed: message.scroll_speed || 0.5,
           pauseDuration: message.pause_duration || 2000,
+          textColor: message.text_color || '#00FF00',
+          bgColor: message.bg_color || '#000000',
+          colorMode: message.color_mode || 'solid',
           isAdminOverride: message.is_admin_override || false,
           source: message.source || 'driver'
         }
