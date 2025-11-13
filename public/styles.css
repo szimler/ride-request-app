@@ -98,46 +98,331 @@ body {
     justify-content: center;
     gap: 12px;
     margin: 0 0 18px 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    flex-wrap: nowrap;
 }
 
-/* Retro Computer-Style Status Box */
-.retro-status-box {
+/* LED Scrolling Sign - Advanced with Vertical/Horizontal Scrolling */
+.led-sign-container {
+    perspective: 1000px;
+}
+
+.led-sign-border {
+    background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+    border: 3px solid #333;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 0 10px rgba(0, 255, 0, 0.03);
+    position: relative;
+}
+
+/* LED Matrix Canvas */
+.led-matrix-canvas {
+    display: block;
     background: #000000;
-    border: 2px solid #ffffff;
+    border: 2px solid #1a1a1a;
     border-radius: 4px;
-    padding: 6px 12px;
-    font-family: 'Courier New', Courier, monospace;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    min-width: 280px;
+    box-shadow: 
+        inset 0 2px 8px rgba(0, 0, 0, 0.8),
+        inset 0 0 30px rgba(0, 255, 0, 0.08);
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+.led-scrolling-text {
+    display: inline-block;
+    padding: 0 16px;
+    font-family: 'Arial Black', 'Arial Bold', Gadget, sans-serif;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    line-height: 48px;
+    white-space: nowrap;
+    text-transform: uppercase;
+    position: relative;
+}
+
+/* Message text with rainbow gradient effect */
+.led-scrolling-text .led-message {
+    display: inline;
+    font-weight: 900;
+    color: #ff3333;
+    text-shadow: 
+        0 0 10px currentColor,
+        0 0 20px currentColor,
+        0 0 30px currentColor,
+        0 0 40px currentColor;
+    animation: rainbowColorCycle 6s linear infinite;
+}
+
+/* Rainbow color cycling animation - like GO BLAZERS! */
+@keyframes rainbowColorCycle {
+    0% { 
+        color: #ff3333; 
+        text-shadow: 0 0 10px #ff3333, 0 0 20px #ff3333, 0 0 30px #ff3333;
+    }
+    14% { 
+        color: #ff8833; 
+        text-shadow: 0 0 10px #ff8833, 0 0 20px #ff8833, 0 0 30px #ff8833;
+    }
+    28% { 
+        color: #ffff33; 
+        text-shadow: 0 0 10px #ffff33, 0 0 20px #ffff33, 0 0 30px #ffff33;
+    }
+    42% { 
+        color: #33ff33; 
+        text-shadow: 0 0 10px #33ff33, 0 0 20px #33ff33, 0 0 30px #33ff33;
+    }
+    56% { 
+        color: #33ffff; 
+        text-shadow: 0 0 10px #33ffff, 0 0 20px #33ffff, 0 0 30px #33ffff;
+    }
+    70% { 
+        color: #3388ff; 
+        text-shadow: 0 0 10px #3388ff, 0 0 20px #3388ff, 0 0 30px #3388ff;
+    }
+    84% { 
+        color: #ff33ff; 
+        text-shadow: 0 0 10px #ff33ff, 0 0 20px #ff33ff, 0 0 30px #ff33ff;
+    }
+    100% { 
+        color: #ff3333; 
+        text-shadow: 0 0 10px #ff3333, 0 0 20px #ff3333, 0 0 30px #ff3333;
+    }
+}
+
+/* Rainbow flow animation */
+@keyframes rainbowFlow {
+    0% {
+        background-position: 0% 50%;
+        filter: 
+            drop-shadow(0 0 6px rgba(255, 0, 0, 0.8))
+            drop-shadow(0 0 10px rgba(255, 255, 0, 0.6))
+            drop-shadow(0 0 14px rgba(0, 255, 0, 0.8))
+            drop-shadow(0 0 18px rgba(0, 100, 255, 0.6));
+    }
+    33% {
+        background-position: 33% 50%;
+        filter: 
+            drop-shadow(0 0 6px rgba(0, 255, 0, 0.8))
+            drop-shadow(0 0 10px rgba(0, 255, 255, 0.6))
+            drop-shadow(0 0 14px rgba(0, 100, 255, 0.8))
+            drop-shadow(0 0 18px rgba(255, 0, 255, 0.6));
+    }
+    66% {
+        background-position: 66% 50%;
+        filter: 
+            drop-shadow(0 0 6px rgba(0, 100, 255, 0.8))
+            drop-shadow(0 0 10px rgba(255, 0, 255, 0.6))
+            drop-shadow(0 0 14px rgba(255, 0, 0, 0.8))
+            drop-shadow(0 0 18px rgba(255, 255, 0, 0.6));
+    }
+    100% {
+        background-position: 100% 50%;
+        filter: 
+            drop-shadow(0 0 6px rgba(255, 0, 0, 0.8))
+            drop-shadow(0 0 10px rgba(255, 255, 0, 0.6))
+            drop-shadow(0 0 14px rgba(0, 255, 0, 0.8))
+            drop-shadow(0 0 18px rgba(0, 100, 255, 0.6));
+    }
+}
+
+/* Horizontal scrolling (left to right) - DEFAULT SLOWER */
+.led-scrolling-text[data-scroll-direction="horizontal"].scrolling {
+    animation: ledScrollHorizontal 20s linear infinite;
+}
+
+/* Vertical scrolling (bottom to top) */
+.led-scrolling-text[data-scroll-direction="vertical"].scrolling {
+    animation: ledScrollVertical 12s linear infinite;
+    display: block;
+    white-space: pre-line;
+    text-align: center;
+    line-height: 1.4;
+}
+
+/* Bounce effect */
+.led-scrolling-text[data-scroll-direction="bounce"].scrolling {
+    animation: ledBounce 3s ease-in-out infinite;
+}
+
+/* Fade in/out effect */
+.led-scrolling-text[data-scroll-direction="fade"].scrolling {
+    animation: ledFade 4s ease-in-out infinite;
+}
+
+/* Static mode - no scroll animation */
+.led-scrolling-text[data-scroll-direction="static"] {
+    /* Rainbow color still cycles on the text itself */
+}
+
+/* Horizontal scroll animation - SLOWED DOWN */
+@keyframes ledScrollHorizontal {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* Scroll speed variations */
+.scroll-slow {
+    animation-duration: 25s !important;
+}
+
+.scroll-medium {
+    animation-duration: 18s !important;
+}
+
+.scroll-fast {
+    animation-duration: 12s !important;
+}
+
+/* Vertical scroll animation */
+@keyframes ledScrollVertical {
+    0% {
+        transform: translateY(100%);
+    }
+    100% {
+        transform: translateY(-200%);
+    }
+}
+
+/* Bounce animation */
+@keyframes ledBounce {
+    0%, 100% {
+        transform: translateX(-50%) scale(1);
+    }
+    25% {
+        transform: translateX(-30%) scale(1.05);
+    }
+    50% {
+        transform: translateX(-50%) scale(0.95);
+    }
+    75% {
+        transform: translateX(-70%) scale(1.05);
+    }
+}
+
+/* Fade animation */
+@keyframes ledFade {
+    0%, 100% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* LED glow pulse */
+@keyframes ledGlow {
+    0% {
+        text-shadow: 
+            0 0 5px currentColor,
+            0 0 10px currentColor,
+            0 0 15px currentColor,
+            0 0 20px currentColor;
+        opacity: 1;
+    }
+    100% {
+        text-shadow: 
+            0 0 8px currentColor,
+            0 0 15px currentColor,
+            0 0 25px currentColor,
+            0 0 35px currentColor;
+        opacity: 0.95;
+    }
+}
+
+/* LED controls and indicators */
+.led-controls {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    gap: 10px;
+    margin-top: 6px;
+    padding: 0 4px;
 }
 
-.retro-status-text {
-    font-size: 14px;
-    font-weight: bold;
+.led-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.led-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00ff00;
+    box-shadow: 
+        0 0 3px #00ff00,
+        0 0 6px #00ff00;
+    animation: ledDotBlink 2s ease-in-out infinite;
+}
+
+.led-dot:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.led-dot:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+@keyframes ledDotBlink {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+}
+
+.led-mode-indicator {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9px;
+    color: #00ff00;
+    text-shadow: 0 0 3px #00ff00;
     letter-spacing: 1px;
-    color: #33ff33;
-    text-shadow: 0 0 4px #33ff33;
-    margin: 0;
-    line-height: 1.2;
-    white-space: nowrap;
+    opacity: 0.7;
 }
 
-.retro-status-time {
-    font-size: 13px;
-    color: #33ff33;
-    text-shadow: 0 0 3px #33ff33;
-    margin: 0;
-    line-height: 1.2;
-    opacity: 0.95;
-    white-space: nowrap;
+/* Status color variations */
+.led-sign-display.status-available .led-scrolling-text,
+.led-sign-display.status-available .led-dot,
+.led-sign-display.status-available .led-mode-indicator {
+    color: #00ff00;
+    background: #00ff00;
 }
 
-.retro-status-time:empty {
-    display: none;
+.led-sign-display.status-offline .led-scrolling-text,
+.led-sign-display.status-offline .led-dot,
+.led-sign-display.status-offline .led-mode-indicator {
+    color: #ff0000;
+    background: #ff0000;
+}
+
+.led-sign-display.status-busy .led-scrolling-text,
+.led-sign-display.status-busy .led-dot,
+.led-sign-display.status-busy .led-mode-indicator {
+    color: #ffaa00;
+    background: #ffaa00;
+}
+
+.led-sign-display.status-info .led-scrolling-text,
+.led-sign-display.status-info .led-dot,
+.led-sign-display.status-info .led-mode-indicator {
+    color: #00aaff;
+    background: #00aaff;
 }
 
 /* Status Buttons (removed - now inline in HTML) */
@@ -149,6 +434,8 @@ body {
     transition: all 0.3s ease;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
     opacity: 1;
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+    object-fit: contain;
 }
 
 .status-btn.active {
@@ -1040,28 +1327,37 @@ textarea::placeholder {
     
     /* Status display responsive */
     .driver-status-display {
-        gap: 8px;
+        gap: 6px;
         margin: 10px 0 8px 0;
+        padding: 0 10px;
+        width: 100%;
+        box-sizing: border-box;
     }
     
-    .retro-status-box {
-        min-width: 240px;
-        padding: 5px 10px;
-        flex-direction: column;
-        gap: 4px;
+    .led-sign-container {
+        flex: 1;
+        min-width: 0; /* Allow shrinking */
+        max-width: 100%;
     }
     
-    .retro-status-text {
-        font-size: 12px;
+    .led-sign-border {
+        padding: 6px;
     }
     
-    .retro-status-time {
-        font-size: 11px;
+    .led-matrix-canvas {
+        max-width: 100%;
+        width: 100%;
+        height: auto;
+    }
+    
+    .led-mode-indicator {
+        font-size: 8px;
     }
     
     .status-btn {
-        width: 28px;
-        height: 28px;
+        width: 24px;
+        height: 24px;
+        flex-shrink: 0; /* Don't shrink the buttons */
     }
 }
 
