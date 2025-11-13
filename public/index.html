@@ -10,6 +10,7 @@
     <title>Request a Ride</title>
     <link rel="manifest" href="manifest-rider.json">
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCIMXA0Sfa7y1T_HU0HKDUfZRrQLseJZC4&libraries=places&callback=initAutocomplete" async defer></script>
 </head>
 <body>
@@ -19,9 +20,10 @@
             <!-- Driver Status Display (Top - Centered) -->
             <div class="driver-status-display">
                 <img src="red-off.png" alt="Unavailable" class="status-btn" id="redStatusBtn">
-                <div class="retro-status-box">
-                    <div class="retro-status-text" id="retroStatusText">CHECKING...</div>
-                    <div class="retro-status-time" id="retroStatusTime"></div>
+                <div class="led-sign-container">
+                    <div class="led-sign-border">
+                        <canvas id="ledMatrixCanvas" class="led-matrix-canvas"></canvas>
+                    </div>
                 </div>
                 <img src="green-off.png" alt="Available" class="status-btn" id="greenStatusBtn">
             </div>
@@ -637,7 +639,8 @@
         </footer>
     </div>
 
-    <script src="app.js"></script>
+    <script src="led-matrix.js?v=20251112036"></script>
+    <script src="app.js?v=20251112036"></script>
 </body>
 </html>
 

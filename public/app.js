@@ -13,9 +13,10 @@ const timeSelect = document.getElementById('requested_time');
 let redStatusBtn = document.getElementById('redStatusBtn');
 let greenStatusBtn = document.getElementById('greenStatusBtn');
 
-// Retro Status Box Elements
-let retroStatusText = document.getElementById('retroStatusText');
-let retroStatusTime = document.getElementById('retroStatusTime');
+// LED Sign Elements (new scrolling LED sign)
+let ledSignDisplay = document.getElementById('ledSignDisplay');
+let ledScrollingText = document.getElementById('ledScrollingText');
+let ledMessage = document.getElementById('ledMessage');
 
 // Old Driver Status Elements (for backwards compatibility, may not exist)
 const driverStatusEl = document.getElementById('driverStatus');
@@ -738,8 +739,8 @@ async function updateDriverStatus() {
         driverStatusEl: !!driverStatusEl,
         statusLight: !!statusLight,
         statusMessage: !!statusMessage,
-        retroStatusText: !!retroStatusText,
-        retroStatusTime: !!retroStatusTime,
+        ledMatrixCanvas: !!document.getElementById('ledMatrixCanvas'),
+        ledMatrix: !!window.ledMatrix,
         redStatusBtn: !!redStatusBtn,
         greenStatusBtn: !!greenStatusBtn
     });
@@ -761,40 +762,11 @@ async function updateDriverStatus() {
             // Debug: Log the show_schedule value
             console.log('Driver status received:', { is_available, show_schedule, schedule_start, schedule_end });
 
-            // Update retro status box
-            if (retroStatusText && retroStatusTime) {
-                if (is_available) {
-                    retroStatusText.textContent = 'ONLINE';
-                    console.log('✅ Set retro status to ONLINE');
-                    
-                    // Show schedule times if enabled
-                    if (show_schedule && schedule_start && schedule_end) {
-                        const startTime = formatTime(schedule_start);
-                        const endTime = formatTime(schedule_end);
-                        retroStatusTime.textContent = `${startTime}-${endTime}`;
-                        console.log('⏰ Set schedule time:', `${startTime}-${endTime}`);
-                    } else {
-                        retroStatusTime.textContent = '';
-                        console.log('⏰ Schedule hidden');
-                    }
-                } else {
-                    retroStatusText.textContent = 'OFFLINE';
-                    console.log('❌ Set retro status to OFFLINE');
-                    
-                    // Show schedule times if enabled
-                    if (show_schedule && schedule_start && schedule_end) {
-                        const startTime = formatTime(schedule_start);
-                        const endTime = formatTime(schedule_end);
-                        retroStatusTime.textContent = `${startTime}-${endTime}`;
-                        console.log('⏰ Set schedule time:', `${startTime}-${endTime}`);
-                    } else {
-                        retroStatusTime.textContent = '';
-                        console.log('⏰ Schedule hidden');
-                    }
-                }
-            } else {
-                console.warn('⚠️ Retro status elements not found!');
-            }
+            // Update LED Matrix display
+            // LED Matrix is controlled by WebSocket updates from server
+            // Driver status changes trigger server-side LED updates via WebSocket
+            // DO NOT update LED here - it's handled by the 'led_sign_updated' socket event
+            console.log(`ℹ️ Driver ${is_available ? 'ONLINE' : 'OFFLINE'} - LED will update via WebSocket from server`);
             
             // Update status buttons (red/green) - both always fully visible
             if (redStatusBtn && greenStatusBtn) {
@@ -853,10 +825,9 @@ async function updateDriverStatus() {
     } catch (err) {
         console.error('Error fetching driver status:', err);
         
-        // Update retro status box
-        if (retroStatusText && retroStatusTime) {
-            retroStatusText.textContent = 'ERROR';
-            retroStatusTime.textContent = '';
+        // Update LED Matrix display with error
+        if (window.ledMatrix) {
+            window.ledMatrix.setMessage('CONNECTION ERROR - PLEASE TRY AGAIN', 'horizontal', 'rainbow');
         }
         
         // Update old status indicator (if present)
@@ -996,7 +967,135 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✓ Driver status checker initialized');
 });
 
+// ============================================
+// LED SIGN MESSAGE LOADER (Customer Page)
+// Loads message from admin-controlled database
+// ============================================
+
+async function loadLEDMessage() {
+    try {
+        const response = await fetch('/api/led-sign/current');
+        const result = await response.json();
+        
+        if (result.success && result.message && window.ledMatrix) {
+            const msg = result.message;
+            const text = msg.message_text || msg.text || 'DRIVER AVAILABLE NOW!';
+            const direction = msg.direction || 'left';
+            const scrollSpeed = parseFloat(msg.scroll_speed || msg.scrollSpeed || 0.3);
+            const pauseDuration = parseInt(msg.pause_duration || msg.pauseDuration || 3000);
+            
+            console.log('📥 Loading LED from API:', { text, direction, scrollSpeed, pauseDuration });
+            
+            // Set speed and pause before message
+            window.ledMatrix.setSpeed(scrollSpeed);
+            window.ledMatrix.setPauseDuration(pauseDuration);
+            
+            // Always use horizontal mode with direction control
+            window.ledMatrix.setMessage(text, 'horizontal', 'rainbow', direction);
+            
+            console.log('✓ LED message loaded from admin settings with direction:', direction);
+        }
+    } catch (error) {
+        console.error('Error loading LED message:', error);
+        // Fallback to default with SLOW speed (0.1x) and proper scrolling
+        if (window.ledMatrix) {
+            window.ledMatrix.setSpeed(0.1);
+            window.ledMatrix.setPauseDuration(2000);
+            window.ledMatrix.setMessage('DRIVER AVAILABLE - BOOK NOW ON THE APP', 'horizontal', 'rainbow', 'left');
+        }
+    }
+}
+
+// Initialize LED message on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for LED Matrix to initialize, then load admin message
+    setTimeout(() => {
+        if (window.ledMatrix) {
+            loadLEDMessage();
+        }
+    }, 100);
+});
+
+// Listen for real-time LED sign updates from admin
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for LED Matrix to initialize
+    setTimeout(() => {
+        if (typeof io !== 'undefined') {
+            const socket = io();
+            
+            socket.on('connect', () => {
+                console.log('✅ Socket.IO connected for LED updates');
+            });
+            
+            // Listen for single message updates (driver mode)
+            socket.on('led_sign_updated', (data) => {
+                console.log('');
+                console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+                console.log('📡 WEBSOCKET: SINGLE LED MESSAGE');
+                console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+                console.log('data.text:', data.text);
+                console.log('data.direction:', data.direction);
+                console.log('data.scrollSpeed:', data.scrollSpeed);
+                console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+                
+                if (window.ledMatrix) {
+                    window.ledMatrix.stopSequence();
+                    window.ledMatrix.stopScrolling();
+                    
+                    const messageText = data.text || 'DRIVER AVAILABLE';
+                    const direction = data.direction || 'left';
+                    const speed = parseFloat(data.scrollSpeed) || 0.1;
+                    const pause = parseInt(data.pauseDuration) || 2000;
+                    const textColor = data.textColor || '#00FF00';
+                    const bgColor = data.bgColor || '#000000';
+                    
+                    window.ledMatrix.setSpeed(speed);
+                    window.ledMatrix.setPauseDuration(pause);
+                    
+                    const colorMode = data.colorMode || 'solid';
+                    
+                    setTimeout(() => {
+                        window.ledMatrix.setMessage(messageText, 'horizontal', colorMode, direction, textColor, bgColor);
+                        console.log('✅ Single message displayed with colorMode:', colorMode, 'colors:', textColor, bgColor);
+                    }, 100);
+                } else {
+                    console.error('❌ LED Matrix not available!');
+                }
+            });
+            
+            // Listen for multiple message sequences (admin mode)
+            socket.on('led_messages_updated', (data) => {
+                console.log('');
+                console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+                console.log('📡 WEBSOCKET: MESSAGE SEQUENCE');
+                console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+                console.log('Message count:', data.messageCount);
+                data.messages.forEach((msg, idx) => {
+                    console.log(`  ${idx + 1}. "${msg.text}" - ${msg.direction} @ ${msg.speed}x, pause ${msg.pause}ms, colors: ${msg.textColor}, ${msg.bgColor}`);
+                });
+                console.log('▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+                
+                if (window.ledMatrix) {
+                    window.ledMatrix.stopScrolling();
+                    
+                    setTimeout(() => {
+                        window.ledMatrix.playMessageSequence(data.messages);
+                        console.log(`✅ Playing ${data.messageCount} message sequence`);
+                    }, 100);
+                } else {
+                    console.error('❌ LED Matrix not available!');
+                }
+            });
+            
+            console.log('✓ LED sign real-time updates enabled');
+        } else {
+            console.warn('⚠️ Socket.IO not loaded - LED updates disabled');
+        }
+    }, 500); // Wait for LED Matrix to initialize
+});
+
 // Log app initialization
 console.log('🚕 Ride Request App with Hourly Service initialized');
+console.log('✓ LED Matrix sign ready (admin-controlled)');
 console.log('Ready to accept ride requests and hourly driver services!');
 
