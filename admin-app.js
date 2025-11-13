@@ -88,35 +88,53 @@ function playAlertTone(duration = 3000) {
     console.log('✓ Admin alert tone playing');
 }
 
-// Unlock audio on user interaction
+// Unlock audio on user interaction (MOBILE-FRIENDLY)
 function unlockAudio() {
     if (!audioUnlocked) {
         initAudioContext();
         
+        // Force resume audio context for mobile
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                console.log('✓ AudioContext resumed for mobile');
+            }).catch(err => {
+                console.log('AudioContext resume failed:', err);
+            });
+        }
+        
+        // Unlock HTML5 audio elements with promises
         const sounds = [notificationSound, alertSoundBackup];
         sounds.forEach(sound => {
             if (sound) {
                 sound.volume = 0.01;
-                sound.play().then(() => {
-                    sound.pause();
-                    sound.currentTime = 0;
-                    sound.volume = 1;
-                }).catch(() => {});
+                const playPromise = sound.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        sound.pause();
+                        sound.currentTime = 0;
+                        sound.volume = 1;
+                    }).catch(() => {});
+                }
             }
         });
         
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-        
         audioUnlocked = true;
-        console.log('✓ Admin audio unlocked');
+        console.log('✓ Admin audio unlocked for mobile');
+        showNotification('🔊 Sound enabled!', 'success');
     }
 }
 
-// Unlock audio on user interaction
-document.addEventListener('click', unlockAudio);
-document.addEventListener('touchstart', unlockAudio);
+// Multiple event listeners for better mobile support
+document.addEventListener('click', unlockAudio, { once: false });
+document.addEventListener('touchstart', unlockAudio, { once: false });
+document.addEventListener('touchend', unlockAudio, { once: false });
+
+// Also unlock when page becomes visible
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+});
 
 // Trigger siren alert for new ride
 async function triggerSirenAlert(rideRequest) {
@@ -1206,8 +1224,15 @@ function playNotificationSound() {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         
-        // Play sound based on selected pattern
-        playSoundPattern(soundPattern);
+        // Force resume for mobile
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                playSoundPattern(soundPattern);
+            });
+        } else {
+            // Play sound based on selected pattern
+            playSoundPattern(soundPattern);
+        }
     }
     
     // Request browser/phone notification (if enabled)

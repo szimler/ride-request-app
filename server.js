@@ -1202,7 +1202,10 @@ app.post('/api/driver/status', async (req, res) => {
     console.log('📋 Driver status update received:', { is_available, schedule_start, schedule_end, show_schedule });
     
     let autoMessage = '';
+    let messageColor = '#00FF00'; // Default green
+    
     if (is_available) {
+      messageColor = '#00FF00'; // Green for available
       if (show_schedule && schedule_start && schedule_end) {
         autoMessage = `DRIVER AVAILABLE ${schedule_start}-${schedule_end} - BOOK NOW ON THE APP`;
         console.log('✅ Generated LED message (with schedule):', autoMessage);
@@ -1211,6 +1214,7 @@ app.post('/api/driver/status', async (req, res) => {
         console.log('✅ Generated LED message (without schedule):', autoMessage);
       }
     } else {
+      messageColor = '#EF4444'; // Red for offline
       autoMessage = 'DRIVER OFFLINE - CHECK BACK LATER';
       console.log('✅ Generated LED message (offline):', autoMessage);
     }
@@ -1233,27 +1237,31 @@ app.post('/api/driver/status', async (req, res) => {
           // Insert driver auto-message with ALL parameters
           const result = await client.query(`
             INSERT INTO led_sign_settings 
-            (message, scroll_mode, direction, scroll_speed, pause_duration, color_mode, is_active, is_admin_override, source)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            (message, scroll_mode, direction, scroll_speed, pause_duration, color_mode, text_color, bg_color, is_active, is_admin_override, source)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-          `, [autoMessage, 'horizontal', 'left', 0.1, 2000, 'rainbow', true, false, 'driver']);
+          `, [autoMessage, 'horizontal', 'left', 0.5, 2000, 'solid', messageColor, '#000000', true, false, 'driver']);
           
           await client.query('COMMIT');
           
           console.log('✅ LED message saved:', {
             message: autoMessage,
-            speed: 0.1,
+            speed: 0.5,
             direction: 'left',
-            pause: 2000
+            pause: 2000,
+            color: messageColor
           });
           
-          // Broadcast LED update with SLOW speed
+          // Broadcast LED update with 0.5x speed and colors
           const ledBroadcast = {
             text: autoMessage,
             scrollMode: 'horizontal',
             direction: 'left',
-            scrollSpeed: 0.1,
+            scrollSpeed: 0.5,
             pauseDuration: 2000,
+            textColor: messageColor,
+            bgColor: '#000000',
+            colorMode: 'solid',
             isAdminOverride: false,
             source: 'driver',
             timestamp: new Date().toISOString()
@@ -1343,8 +1351,11 @@ app.get('/api/led-sign/current', async (req, res) => {
       text: 'DRIVER AVAILABLE - BOOK NOW ON THE APP',
       scrollMode: 'horizontal',
       direction: 'left',
-      scrollSpeed: 0.1,
-      pauseDuration: 2000
+      scrollSpeed: 0.5,
+      pauseDuration: 2000,
+      textColor: '#00FF00',
+      bgColor: '#000000',
+      colorMode: 'solid'
     };
     
     if (message) {
@@ -1570,36 +1581,42 @@ app.post('/api/led-sign/clear-override', authenticateToken, async (req, res) => 
       // Get current driver status to generate auto-message
       const driverStatus = await getDriverStatus();
       let autoMessage = '';
+      let messageColor = '#00FF00'; // Default green
       
       if (driverStatus.is_available) {
+        messageColor = '#00FF00'; // Green for available
         if (driverStatus.show_schedule && driverStatus.schedule_start && driverStatus.schedule_end) {
           autoMessage = `DRIVER AVAILABLE ${driverStatus.schedule_start}-${driverStatus.schedule_end} - BOOK NOW ON THE APP`;
         } else {
           autoMessage = 'DRIVER AVAILABLE NOW - BOOK NOW ON THE APP';
         }
       } else {
+        messageColor = '#EF4444'; // Red for offline
         autoMessage = 'DRIVER OFFLINE - CHECK BACK LATER';
       }
       
-      // Insert driver auto-message (NO override) with SLOW speed (0.1x)
+      // Insert driver auto-message (NO override) with 0.5x speed
       const result = await client.query(`
         INSERT INTO led_sign_settings 
-        (message, scroll_mode, direction, scroll_speed, pause_duration, color_mode, is_active, is_admin_override, source)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (message, scroll_mode, direction, scroll_speed, pause_duration, color_mode, text_color, bg_color, is_active, is_admin_override, source)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
-      `, [autoMessage, 'horizontal', 'left', 0.1, 2000, 'rainbow', true, false, 'driver']);
+      `, [autoMessage, 'horizontal', 'left', 0.5, 2000, 'solid', messageColor, '#000000', true, false, 'driver']);
       
       console.log('✅ LED saved with speed:', result.rows[0].scroll_speed);
       
       await client.query('COMMIT');
       
-      // Broadcast LED update with SLOW speed
+      // Broadcast LED update with 0.5x speed and colors
       const ledBroadcast = {
         text: autoMessage,
         scrollMode: 'horizontal',
         direction: 'left',
-        scrollSpeed: 0.1,
+        scrollSpeed: 0.5,
         pauseDuration: 2000,
+        textColor: messageColor,
+        bgColor: '#000000',
+        colorMode: 'solid',
         isAdminOverride: false,
         source: 'driver',
         timestamp: new Date().toISOString()
