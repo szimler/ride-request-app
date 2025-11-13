@@ -21,6 +21,7 @@ let driverState = {
 
 // Elements
 const availabilityToggle = document.getElementById('availabilityToggle');
+const toggleLabel = document.querySelector('.toggle-label');
 const scheduleStart = document.getElementById('scheduleStart');
 const scheduleEnd = document.getElementById('scheduleEnd');
 const saveScheduleBtn = document.getElementById('saveScheduleBtn');
@@ -166,6 +167,7 @@ function loadSettings() {
         
         // Apply to UI
         availabilityToggle.checked = driverState.isAvailable;
+        updateToggleLabel();
         scheduleStart.value = driverState.scheduleStart;
         scheduleEnd.value = driverState.scheduleEnd;
         showScheduleToggle.checked = driverState.showSchedule;
@@ -187,11 +189,20 @@ function saveSettings() {
     console.log('✓ Settings saved');
 }
 
+// Update toggle label based on availability state
+function updateToggleLabel() {
+    if (toggleLabel) {
+        toggleLabel.textContent = driverState.isAvailable ? 'Available' : 'Unavailable';
+        toggleLabel.style.color = driverState.isAvailable ? '#10b981' : '#ef4444';
+    }
+}
+
 // Setup event listeners
 function setupEventListeners() {
     // Availability toggle
     availabilityToggle.addEventListener('change', async () => {
         driverState.isAvailable = availabilityToggle.checked;
+        updateToggleLabel();
         saveSettings();
         await updateDriverAvailability();
         showToast(driverState.isAvailable ? 'You are now available' : 'You are now unavailable', driverState.isAvailable ? 'success' : 'info');
@@ -408,6 +419,7 @@ async function loadDriverStatus() {
                 driverState.showSchedule = data.status.show_schedule !== false; // Default to true
                 
                 availabilityToggle.checked = driverState.isAvailable;
+                updateToggleLabel();
                 scheduleStart.value = driverState.scheduleStart;
                 scheduleEnd.value = driverState.scheduleEnd;
                 showScheduleToggle.checked = driverState.showSchedule;
