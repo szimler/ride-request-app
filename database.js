@@ -99,6 +99,54 @@ async function initializeDatabase() {
     `);
     console.log('✓ Activity logs table ready');
 
+    // LED sign settings table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS led_sign_settings (
+        id SERIAL PRIMARY KEY,
+        message TEXT NOT NULL,
+        scroll_mode TEXT DEFAULT 'horizontal',
+        direction TEXT DEFAULT 'left',
+        scroll_speed NUMERIC DEFAULT 0.5,
+        pause_duration INTEGER DEFAULT 2000,
+        color_mode TEXT DEFAULT 'rainbow',
+        is_active BOOLEAN DEFAULT true,
+        is_admin_override BOOLEAN DEFAULT false,
+        source TEXT DEFAULT 'driver',
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        FOREIGN KEY (created_by) REFERENCES admin_users(id)
+      )
+    `);
+    console.log('✓ LED sign settings table ready');
+    
+    // Add missing columns if table already exists
+    try {
+      await client.query(`
+        ALTER TABLE led_sign_settings 
+        ADD COLUMN IF NOT EXISTS direction TEXT DEFAULT 'left',
+        ADD COLUMN IF NOT EXISTS scroll_speed NUMERIC DEFAULT 0.5,
+        ADD COLUMN IF NOT EXISTS pause_duration INTEGER DEFAULT 2000,
+        ADD COLUMN IF NOT EXISTS is_admin_override BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'driver',
+        ADD COLUMN IF NOT EXISTS text_color TEXT DEFAULT '#00FF00',
+        ADD COLUMN IF NOT EXISTS bg_color TEXT DEFAULT '#000000'
+      `);
+      console.log('✓ LED sign columns updated (including colors)');
+    } catch (err) {
+      console.log('  (columns may already exist)');
+    }
+
+    // Create default LED sign message if none exists
+    const ledCheck = await client.query('SELECT COUNT(*) as count FROM led_sign_settings');
+    if (ledCheck.rows[0].count === '0') {
+      await client.query(`
+        INSERT INTO led_sign_settings (message, scroll_mode, color_mode, is_active)
+        VALUES ($1, $2, $3, $4)
+      `, ['DRIVER AVAILABLE - BOOK YOUR RIDE NOW!', 'horizontal', 'rainbow', true]);
+      console.log('✓ Default LED sign message created');
+    }
+
     // Customers table
     await client.query(`
       CREATE TABLE IF NOT EXISTS customers (
@@ -681,6 +729,111 @@ function getActiveDriverRides() {
   });
 }
 
+// ===========================
+// LED SIGN SETTINGS FUNCTIONS
+// ===========================
+
+// Get current active LED sign message
+function getCurrentLEDMessage() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        'SELECT * FROM led_sign_settings WHERE is_active = true ORDER BY updated_at DESC LIMIT 1'
+      );
+      resolve(result.rows[0] || null);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Update LED sign message
+function updateLEDMessage(messageText, scrollMode, updatedBy) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Deactivate all previous messages
+      await pool.query('UPDATE led_sign_settings SET is_active = false');
+      
+      // Insert new message
+      const result = await pool.query(`
+        INSERT INTO led_sign_settings (message_text, scroll_mode, is_active, updated_by, updated_at)
+        VALUES ($1, $2, true, $3, NOW())
+        RETURNING *
+      `, [messageText, scrollMode, updatedBy]);
+      
+      resolve(result.rows[0]);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Get LED message history
+function getLEDMessageHistory(limit = 50) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const result = await pool.query(
+        `SELECT ls.*, au.username 
+         FROM led_sign_settings ls
+         LEFT JOIN admin_users au ON ls.updated_by = au.id
+         ORDER BY ls.updated_at DESC 
+         LIMIT $1`,
+        [limit]
+      );
+      resolve(result.rows);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// ===========================
+// LED SIGN SETTINGS FUNCTIONS
+// ===========================
+
+// Get active LED sign message
+async function getActiveLEDMessage() {
+  const result = await pool.query(
+    'SELECT * FROM led_sign_settings WHERE is_active = true ORDER BY updated_at DESC LIMIT 1'
+  );
+  return result.rows[0] || null;
+}
+
+// Update LED sign message
+async function updateLEDMessage(message, scrollMode, colorMode, userId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Deactivate all previous messages
+    await client.query('UPDATE led_sign_settings SET is_active = false');
+    
+    // Insert new message
+    const result = await client.query(`
+      INSERT INTO led_sign_settings (message, scroll_mode, color_mode, is_active, created_by, updated_at)
+      VALUES ($1, $2, $3, true, $4, NOW())
+      RETURNING *
+    `, [message, scrollMode, colorMode, userId]);
+    
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Get LED message history
+async function getLEDMessageHistory(limit = 20) {
+  const result = await pool.query(
+    'SELECT * FROM led_sign_settings ORDER BY updated_at DESC LIMIT $1',
+    [limit]
+  );
+  return result.rows;
+}
+
 module.exports = {
   pool,
   createRideRequest,
@@ -702,6 +855,10 @@ module.exports = {
   getActivityLogs,
   getActivityLogsByUser,
   getActivityLogsByRideRequest,
+  // LED sign functions
+  getActiveLEDMessage,
+  updateLEDMessage,
+  getLEDMessageHistory,
   // Customer functions
   upsertCustomer,
   getAllCustomers,
@@ -714,5 +871,18 @@ module.exports = {
   // Driver status functions
   getDriverStatus,
   updateDriverStatus,
-  getActiveDriverRides
+  getActiveDriverRides,
+  // LED sign functions (using existing system)
+  getCurrentLEDMessage,
+  updateLEDMessage,
+  getLEDMessageHistory,
+  // Aliases for compatibility
+  getActiveLEDMessage: getCurrentLEDMessage,
+  getLEDSignSettings: getCurrentLEDMessage,
+  updateLEDSignSettings: updateLEDMessage,
+  getAllLEDMessages: getLEDMessageHistory,
+  getEnabledLEDMessages: getLEDMessageHistory,
+  createLEDMessage: updateLEDMessage,
+  deleteLEDMessage: () => Promise.resolve({ success: false }),
+  updateAutoLEDMessage: () => Promise.resolve({ success: true })
 };

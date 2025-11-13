@@ -2779,6 +2779,584 @@ Thank you for your understanding!`;
     }, 500);
 }
 
+// ============================================
+// LED SIGN MODAL FUNCTIONS
+// ============================================
+
+// LED Preview instance
+let ledPreview = null;
+let ledMessages = []; // Array to store multiple messages
+let messageCounter = 0;
+
+async function openLEDSignModal() {
+    const modal = document.getElementById('ledSignModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        
+        // Initialize preview LED matrix
+        if (!ledPreview && typeof LEDMatrix !== 'undefined') {
+            ledPreview = new LEDMatrix('ledPreviewCanvas', {
+                ledSize: 3,
+                ledSpacing: 1,
+                rows: 7,
+                cols: 60
+            });
+        }
+        
+        // Clear previous messages and RESET counter
+        ledMessages = [];
+        messageCounter = 0; // RESET counter each time modal opens
+        const container = document.getElementById('ledMessagesContainer');
+        if (container) container.innerHTML = '';
+        
+        // Get current LED and driver status FIRST
+        let initialMessage = null;
+        let initialDirection = 'left';
+        let initialSpeed = 0.1;
+        let initialPause = 2;
+        
+        try {
+            // Check if there are multiple admin override messages
+            const allMessagesResponse = await fetch('/api/led-sign/all-active');
+            const allMessagesResult = await allMessagesResponse.json();
+            
+            // Also get current driver status
+            const driverResponse = await fetch('/api/driver/status');
+            const driverResult = await driverResponse.json();
+            
+            let showDriverMessage = false;
+            
+            if (allMessagesResult.success && allMessagesResult.isAdminOverride && allMessagesResult.messages.length > 0) {
+                // Admin override exists - load ALL messages
+                console.log(`✅ Loading ${allMessagesResult.count} existing override messages`);
+                
+                for (const msg of allMessagesResult.messages) {
+                    addLEDMessage(
+                        msg.message,
+                        msg.direction || 'left',
+                        parseFloat(msg.scroll_speed) || 0.1,
+                        Math.round((msg.pause_duration || 2000) / 1000),
+                        msg.text_color || '#00FF00',
+                        msg.bg_color || '#000000'
+                    );
+                }
+                
+                showNotification(`⚠️ Admin override active - ${allMessagesResult.count} message(s) loaded`, 'info');
+                // Don't add any more messages - we loaded them from database
+            } else {
+                // No admin override - show driver message
+                showDriverMessage = true;
+                
+                if (driverResult.success) {
+                    const status = driverResult.status;
+                    
+                    if (status.is_available) {
+                        if (status.show_schedule && status.schedule_start && status.schedule_end) {
+                            initialMessage = `DRIVER AVAILABLE ${status.schedule_start}-${status.schedule_end} - BOOK NOW ON THE APP`;
+                        } else {
+                            initialMessage = 'DRIVER AVAILABLE NOW - BOOK NOW ON THE APP';
+                        }
+                    } else {
+                        initialMessage = 'DRIVER OFFLINE - CHECK BACK LATER';
+                    }
+                    
+                    initialDirection = 'left';
+                    initialSpeed = 0.1;
+                    initialPause = 2;
+                    
+                    console.log('✅ Will show LIVE driver message:', initialMessage);
+                    showNotification(`Showing driver status: ${status.is_available ? 'ONLINE' : 'OFFLINE'}`, 'info');
+                    
+                    // Add driver message entry (with default green on black)
+                    addLEDMessage(initialMessage, initialDirection, initialSpeed, initialPause, '#00FF00', '#000000');
+                }
+            }
+        } catch (error) {
+            console.error('Error loading LED settings:', error);
+            // Fallback: add one empty message
+            if (ledMessages.length === 0) {
+                addLEDMessage('PREVIEW', 'left', 0.1, 2, '#00FF00', '#000000');
+            }
+        }
+        
+        // Setup live preview updates
+        setupLivePreview();
+        
+        console.log('LED Sign modal opened');
+    }
+}
+
+// Setup live preview that updates as user types/changes settings
+function setupLivePreview() {
+    function updatePreview() {
+        if (!ledPreview) {
+            console.error('❌ ledPreview not initialized');
+            return;
+        }
+        
+        // READ FRESH VALUES from the FIRST message entry
+        const messageId = ledMessages[0]; // Preview first message
+        if (!messageId) return;
+        
+        const messageInput = document.getElementById(`ledText${messageId}`);
+        const scrollDirection = document.getElementById(`ledDirection${messageId}`);
+        const scrollSpeed = document.getElementById(`ledSpeed${messageId}`);
+        const pauseDuration = document.getElementById(`ledPause${messageId}`);
+        const textColorInput = document.getElementById(`ledTextColor${messageId}`);
+        const bgColorInput = document.getElementById(`ledBgColor${messageId}`);
+        
+        console.log('');
+        console.log('🔍 PREVIEW UPDATE - Reading form elements FRESH:');
+        console.log('   scrollDirection element:', scrollDirection);
+        console.log('   scrollDirection ID:', scrollDirection?.id);
+        console.log('   scrollDirection tagName:', scrollDirection?.tagName);
+        console.log('   scrollDirection exists?', !!scrollDirection);
+        console.log('   scrollDirection.value:', scrollDirection?.value);
+        console.log('   scrollDirection.selectedIndex:', scrollDirection?.selectedIndex);
+        if (scrollDirection && scrollDirection.options) {
+            console.log('   All options:', Array.from(scrollDirection.options).map(o => o.value));
+            console.log('   Selected option text:', scrollDirection.options[scrollDirection.selectedIndex]?.text);
+            console.log('   Selected option value:', scrollDirection.options[scrollDirection.selectedIndex]?.value);
+        }
+        
+        // MANUAL TEST - what does querySelector return?
+        const manualCheck = document.querySelector('#ledScrollDirection');
+        console.log('   🧪 Manual querySelector result:', manualCheck);
+        console.log('   🧪 Manual querySelector value:', manualCheck?.value);
+        
+        const colorModeSelect = document.getElementById(`ledColorMode${messageId}`);
+        
+        const text = messageInput?.value || 'PREVIEW';
+        const direction = scrollDirection?.value || 'left';
+        const speed = parseFloat(scrollSpeed?.value || 0.5);
+        const pause = parseFloat(pauseDuration?.value || 2) * 1000;
+        const colorMode = colorModeSelect?.value || 'solid';
+        const textColor = textColorInput?.value || '#00FF00';
+        const bgColor = bgColorInput?.value || '#000000';
+        
+        console.log('');
+        console.log('📝 Final values to send to LED:');
+        console.log('   text:', text);
+        console.log('   direction:', direction, '(type:', typeof direction, ')');
+        console.log('   speed:', speed);
+        console.log('   pause:', pause);
+        console.log('   colorMode:', colorMode);
+        console.log('   textColor:', textColor);
+        console.log('   bgColor:', bgColor);
+        
+        // Update preview with direction and colors
+        ledPreview.setSpeed(speed);
+        ledPreview.setPauseDuration(pause);
+        
+        console.log('');
+        console.log('📤 Calling ledPreview.setMessage() with parameters:');
+        console.log('   [0] text:', text.toUpperCase());
+        console.log('   [1] scrollMode:', 'horizontal');
+        console.log('   [2] colorMode:', colorMode);
+        console.log('   [3] direction:', direction);
+        console.log('   [4] textColor:', textColor);
+        console.log('   [5] bgColor:', bgColor);
+        
+        ledPreview.setMessage(text.toUpperCase(), 'horizontal', colorMode, direction, textColor, bgColor);
+        
+        console.log('✅ setMessage() call completed');
+    }
+    
+    // Make it globally accessible for presets
+    window.updateLEDPreview = updatePreview;
+    
+    // Function to preview message sequence
+    function previewSequence() {
+        if (!ledPreview || ledMessages.length === 0) return;
+        
+        // Collect all current messages with colors
+        const messages = [];
+        for (const msgId of ledMessages) {
+            const text = document.getElementById(`ledText${msgId}`)?.value || '';
+            const direction = document.getElementById(`ledDirection${msgId}`)?.value || 'left';
+            const speed = parseFloat(document.getElementById(`ledSpeed${msgId}`)?.value || 0.1);
+            const pause = parseFloat(document.getElementById(`ledPause${msgId}`)?.value || 2) * 1000;
+            const colorMode = document.getElementById(`ledColorMode${msgId}`)?.value || 'solid';
+            const textColor = document.getElementById(`ledTextColor${msgId}`)?.value || '#00FF00';
+            const bgColor = document.getElementById(`ledBgColor${msgId}`)?.value || '#000000';
+            
+            if (text.trim()) {
+                messages.push({ 
+                    text: text.toUpperCase(), 
+                    direction, 
+                    speed, 
+                    pause,
+                    textColor,
+                    bgColor,
+                    colorMode
+                });
+            }
+        }
+        
+        if (messages.length > 0) {
+            ledPreview.playMessageSequence(messages);
+            console.log(`🎬 Preview playing ${messages.length} message sequence with colors`);
+        }
+    }
+    
+    window.previewSequence = previewSequence;
+    
+    // Add event listeners - wait for DOM
+    setTimeout(() => {
+        console.log('🎯 Setting up preview event listeners...');
+        
+        // Trigger sequence preview when ANY field changes
+        const container = document.getElementById('ledMessagesContainer');
+        if (container) {
+            container.addEventListener('input', previewSequence);
+            container.addEventListener('change', previewSequence);
+            console.log('   ✓ Container listeners added');
+        }
+        
+        console.log('✅ All preview listeners set up');
+        
+        // Initial preview of full sequence
+        console.log('🎬 Triggering initial sequence preview...');
+        previewSequence();
+    }, 300);
+}
+
+function closeLEDSignModal() {
+    const modal = document.getElementById('ledSignModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        console.log('LED Sign modal closed');
+    }
+}
+
+// LED Sign preset messages
+function useLEDPreset(presetType) {
+    const messageInput = document.getElementById('ledMessageInput');
+    const scrollDirection = document.getElementById('ledScrollDirection');
+    
+    const presets = {
+        available: { text: 'DRIVER AVAILABLE NOW - BOOK NOW ON THE APP', direction: 'left' },
+        offline: { text: 'DRIVER OFFLINE - CHECK BACK LATER', direction: 'static' },
+        busy: { text: 'DRIVER BUSY - AVAILABLE SOON', direction: 'up' },
+        special: { text: 'SPECIAL OFFER - BOOK NOW ON THE APP', direction: 'left' }
+    };
+    
+    const preset = presets[presetType];
+    if (preset) {
+        if (messageInput) messageInput.value = preset.text;
+        if (scrollDirection) scrollDirection.value = preset.direction;
+        console.log('✓ Preset applied:', presetType, preset);
+        
+        // Trigger preview update
+        setTimeout(() => {
+            const previewUpdateFunc = window.updateLEDPreview || function() {};
+            previewUpdateFunc();
+        }, 100);
+    }
+}
+
+// Update LED sign message (supports multiple messages)
+async function updateLEDSignMessage() {
+    // Collect all messages from the form
+    const messagesData = [];
+    
+    for (const messageId of ledMessages) {
+        const textInput = document.getElementById(`ledText${messageId}`);
+        const directionSelect = document.getElementById(`ledDirection${messageId}`);
+        const speedSlider = document.getElementById(`ledSpeed${messageId}`);
+        const pauseSlider = document.getElementById(`ledPause${messageId}`);
+        const textColorInput = document.getElementById(`ledTextColor${messageId}`);
+        const bgColorInput = document.getElementById(`ledBgColor${messageId}`);
+        const colorModeSelect = document.getElementById(`ledColorMode${messageId}`);
+        
+        if (!textInput || !textInput.value.trim()) {
+            showNotification(`Message ${messageId} is empty! Please fill all messages or remove empty ones.`, 'error');
+            return;
+        }
+        
+        const colorMode = colorModeSelect?.value || 'solid';
+        
+        messagesData.push({
+            text: textInput.value.trim().toUpperCase(),
+            direction: directionSelect?.value || 'left',
+            speed: parseFloat(speedSlider?.value || 0.1),
+            pause: parseFloat(pauseSlider?.value || 2) * 1000,
+            textColor: colorMode === 'solid' ? (textColorInput?.value || '#00FF00') : null,
+            bgColor: bgColorInput?.value || '#000000',
+            colorMode: colorMode
+        });
+    }
+    
+    if (messagesData.length === 0) {
+        showNotification('Please add at least one message', 'error');
+        return;
+    }
+    
+    console.log('');
+    console.log('████████████████████████████████████████');
+    console.log('📤 ADMIN: Sending Multi-Message LED Update');
+    console.log('████████████████████████████████████████');
+    console.log('Total messages:', messagesData.length);
+    messagesData.forEach((msg, idx) => {
+        console.log(`  Message ${idx + 1}:`, msg);
+    });
+    console.log('████████████████████████████████████████');
+    
+    try {
+        const response = await fetch('/api/led-sign/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                messages: messagesData,
+                isAdminOverride: true,
+                source: 'admin',
+                updatedBy: currentUser?.username || 'admin'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification(`✅ ADMIN OVERRIDE ACTIVE - ${messagesData.length} message(s) set!`, 'success');
+            closeLEDSignModal();
+        } else {
+            showNotification(result.message || 'Failed to update LED sign', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating LED sign:', error);
+        showNotification('Error updating LED sign', 'error');
+    }
+}
+
+// Load and preview driver auto-message (DOESN'T clear override, just shows what driver is sending)
+async function loadDriverAutoMessage() {
+    try {
+        const response = await fetch('/api/driver/status');
+        const result = await response.json();
+        
+        if (result.success && result.status) {
+            const status = result.status;
+            let autoMessage = '';
+            
+            // Generate the same message that driver app would send
+            if (status.is_available) {
+                if (status.show_schedule && status.schedule_start && status.schedule_end) {
+                    autoMessage = `DRIVER AVAILABLE ${status.schedule_start}-${status.schedule_end} - BOOK NOW ON THE APP`;
+                } else {
+                    autoMessage = 'DRIVER AVAILABLE NOW - BOOK NOW ON THE APP';
+                }
+            } else {
+                autoMessage = 'DRIVER OFFLINE - CHECK BACK LATER';
+            }
+            
+            // Pre-fill form with driver auto-message
+            const messageInput = document.getElementById('ledMessageInput');
+            const scrollDirection = document.getElementById('ledScrollDirection');
+            const scrollSpeed = document.getElementById('ledScrollSpeed');
+            const pauseDuration = document.getElementById('ledPauseDuration');
+            
+            if (messageInput) messageInput.value = autoMessage;
+            if (scrollDirection) scrollDirection.value = 'left';
+            if (scrollSpeed) scrollSpeed.value = 0.1;
+            if (pauseDuration) pauseDuration.value = 2;
+            
+            // Update speed display
+            const speedValue = document.getElementById('speedValue');
+            if (speedValue) speedValue.textContent = '0.1';
+            
+            console.log('🚗 Driver auto-message loaded:', autoMessage);
+            showNotification(`Driver is sending: "${autoMessage}"`, 'info');
+            
+            // Trigger preview update
+            setTimeout(() => {
+                const previewUpdateFunc = window.updateLEDPreview || function() {};
+                previewUpdateFunc();
+            }, 100);
+        }
+    } catch (error) {
+        console.error('Error loading driver message:', error);
+        showNotification('Error loading driver message', 'error');
+    }
+}
+
+// Clear admin override - let driver control LED again
+async function clearAdminOverride() {
+    if (!confirm('Remove admin override? LED will show driver auto-messages again.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/led-sign/clear-override', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('✅ Admin override cleared! Driver now controls LED.', 'success');
+            closeLEDSignModal();
+        } else {
+            showNotification(result.message || 'Failed to clear override', 'error');
+        }
+    } catch (error) {
+        console.error('Error clearing override:', error);
+        showNotification('Error clearing override', 'error');
+    }
+}
+
+// Add new LED message entry with optional pre-fill data
+function addLEDMessage(text = '', direction = 'left', speed = 0.1, pause = 2, textColor = '#00FF00', bgColor = '#000000', useRainbow = false) {
+    const container = document.getElementById('ledMessagesContainer');
+    if (!container) return;
+    
+    const messageId = ++messageCounter;
+    const messageDiv = document.createElement('div');
+    messageDiv.id = `ledMessage${messageId}`;
+    messageDiv.className = 'led-message-entry';
+    messageDiv.style.cssText = 'border: 2px solid #E5E7EB; border-radius: 8px; padding: 15px; margin-bottom: 15px; position: relative;';
+    
+    messageDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h4 style="margin: 0; color: #1f2937;">Message ${messageId}</h4>
+            ${messageId > 1 ? `<button type="button" onclick="removeLEDMessage(${messageId})" class="btn-secondary" style="padding: 5px 10px; font-size: 12px; background: #ef4444; color: white;">🗑️ Remove</button>` : ''}
+        </div>
+        
+        <div class="form-group">
+            <label>Text (use :smile: :heart: :star: :car: :check: :arrow: :phone: :clock: :sun: :moon: :fire: :thumb: for emojis!)</label>
+            <input type="text" id="ledText${messageId}" value="${text}" placeholder="Message text... (Try: HELLO :heart: WORLD)" maxlength="150" style="font-family: monospace; font-size: 14px; width: 100%; padding: 8px;">
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+                <label>Direction</label>
+                <select id="ledDirection${messageId}" style="width: 100%; padding: 8px; font-size: 14px;">
+                    <option value="left" ${direction === 'left' ? 'selected' : ''}>⬅️ Left</option>
+                    <option value="right" ${direction === 'right' ? 'selected' : ''}>➡️ Right</option>
+                    <option value="up" ${direction === 'up' ? 'selected' : ''}>⬆️ Up</option>
+                    <option value="down" ${direction === 'down' ? 'selected' : ''}>⬇️ Down</option>
+                    <option value="static" ${direction === 'static' ? 'selected' : ''}>⏹️ Static</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Text Color 🎨</label>
+                <input type="color" id="ledTextColor${messageId}" value="${textColor}" ${useRainbow ? 'disabled' : ''} style="width: 100%; height: 40px; padding: 2px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+            </div>
+            
+            <div class="form-group">
+                <label>Background 🖌️</label>
+                <input type="color" id="ledBgColor${messageId}" value="${bgColor}" style="width: 100%; height: 40px; padding: 2px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+            </div>
+            
+            <div class="form-group">
+                <label>Color Mode</label>
+                <select id="ledColorMode${messageId}" onchange="handleColorModeChange(${messageId})" style="width: 100%; padding: 8px; font-size: 13px;">
+                    <option value="solid" ${!useRainbow ? 'selected' : ''}>🎨 Solid Color</option>
+                    <option value="rainbow" ${useRainbow ? 'selected' : ''}>🌈 Rainbow (Text)</option>
+                    <option value="gradient">🎨 Gradient (Fixed)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+                <label>Speed: <span id="speedValue${messageId}">${speed}</span>x</label>
+                <input type="range" id="ledSpeed${messageId}" min="0.1" max="2" step="0.1" value="${speed}" style="width: 100%;" 
+                       oninput="document.getElementById('speedValue${messageId}').textContent = this.value">
+            </div>
+            
+            <div class="form-group">
+                <label>Pause After: <span id="pauseValue${messageId}">${pause}</span>s</label>
+                <input type="range" id="ledPause${messageId}" min="2" max="10" step="1" value="${pause}" style="width: 100%;" 
+                       oninput="document.getElementById('pauseValue${messageId}').textContent = this.value">
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(messageDiv);
+    ledMessages.push(messageId);
+    
+    // If this is Message 1, attach preview listeners
+    if (messageId === 1) {
+        setTimeout(() => {
+            const textInput = document.getElementById(`ledText${messageId}`);
+            const directionSelect = document.getElementById(`ledDirection${messageId}`);
+            const speedSlider = document.getElementById(`ledSpeed${messageId}`);
+            const pauseSlider = document.getElementById(`ledPause${messageId}`);
+            const textColorInput = document.getElementById(`ledTextColor${messageId}`);
+            const bgColorInput = document.getElementById(`ledBgColor${messageId}`);
+            
+            const updatePreview = window.updateLEDPreview;
+            if (updatePreview) {
+                if (textInput) textInput.addEventListener('input', updatePreview);
+                if (directionSelect) directionSelect.addEventListener('change', updatePreview);
+                if (speedSlider) speedSlider.addEventListener('input', updatePreview);
+                if (pauseSlider) pauseSlider.addEventListener('input', updatePreview);
+                if (textColorInput) textColorInput.addEventListener('input', updatePreview);
+                if (bgColorInput) bgColorInput.addEventListener('input', updatePreview);
+                
+                // Trigger initial preview
+                updatePreview();
+                console.log('✅ Preview listeners attached to Message 1 (including colors)');
+            }
+        }, 100);
+    }
+    
+    console.log(`➕ Added message entry ${messageId}${text ? ' with text: ' + text : ''}`);
+}
+
+// Handle color mode changes
+function handleColorModeChange(messageId) {
+    const colorModeSelect = document.getElementById(`ledColorMode${messageId}`);
+    const textColorPicker = document.getElementById(`ledTextColor${messageId}`);
+    
+    if (colorModeSelect && textColorPicker) {
+        const mode = colorModeSelect.value;
+        
+        if (mode === 'solid') {
+            // Solid color - enable text color picker
+            textColorPicker.disabled = false;
+            textColorPicker.style.opacity = '1';
+        } else {
+            // Rainbow or gradient - disable text color picker
+            textColorPicker.disabled = true;
+            textColorPicker.style.opacity = '0.5';
+        }
+        
+        // Trigger preview update if it exists
+        if (window.previewSequence) {
+            window.previewSequence();
+        }
+    }
+}
+
+// Remove LED message entry
+function removeLEDMessage(messageId) {
+    const messageDiv = document.getElementById(`ledMessage${messageId}`);
+    if (messageDiv) {
+        messageDiv.remove();
+        ledMessages = ledMessages.filter(id => id !== messageId);
+        console.log(`🗑️ Removed message entry ${messageId}`);
+    }
+}
+
+// Make functions globally accessible
+window.openLEDSignModal = openLEDSignModal;
+window.closeLEDSignModal = closeLEDSignModal;
+window.useLEDPreset = useLEDPreset;
+window.updateLEDSignMessage = updateLEDSignMessage;
+window.clearAdminOverride = clearAdminOverride;
+window.loadDriverAutoMessage = loadDriverAutoMessage;
+window.addLEDMessage = addLEDMessage;
+window.removeLEDMessage = removeLEDMessage;
+
 console.log('🚕 Admin Dashboard initialized with full workflow');
 
 // ============================================

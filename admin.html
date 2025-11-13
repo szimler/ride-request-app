@@ -90,6 +90,13 @@
                 <h1>Ride Requests Dashboard</h1>
             </div>
             <div class="header-right">
+                <button id="ledSignBtn" class="icon-btn" title="LED Sign Control" onclick="openLEDSignModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </button>
                 <button id="backupBtn" class="icon-btn" title="Backup & Export">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -436,6 +443,62 @@
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="closeQuotePopup()">Cancel</button>
                 <button class="btn-primary" onclick="submitQuoteToRider()">📱 Send Quote via SMS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OLD DUPLICATE LED MODAL REMOVED -->
+    <div id="ledSignModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>🎨 LED Sign Control Panel</h2>
+                <button class="modal-close" onclick="closeLEDSignModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Live Preview -->
+                <div style="background: #000; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="color: #fff; font-size: 14px; margin-bottom: 10px;">📺 LIVE PREVIEW</h3>
+                    <canvas id="ledPreviewCanvas" style="display: block; margin: 0 auto; border: 2px solid #333; border-radius: 4px;"></canvas>
+                </div>
+
+                <!-- Messages Container -->
+                <div id="ledMessagesContainer">
+                    <!-- Message entries will be added here dynamically -->
+                </div>
+                
+                <!-- Add Message Button -->
+                <button type="button" onclick="addLEDMessage()" class="btn-secondary" style="width: 100%; margin-bottom: 20px;">
+                    ➕ Add Another Message
+                </button>
+
+                <!-- Quick Presets -->
+                <div class="form-group">
+                    <label>Quick Presets</label>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="btn-secondary" onclick="loadDriverAutoMessage()" style="flex: 1; min-width: 140px; background: #3b82f6; color: white;">🚗 Driver Auto-Message</button>
+                        <button type="button" class="btn-secondary" onclick="useLEDPreset('available')" style="flex: 1; min-width: 100px;">✅ Available</button>
+                        <button type="button" class="btn-secondary" onclick="useLEDPreset('offline')" style="flex: 1; min-width: 100px;">❌ Offline</button>
+                        <button type="button" class="btn-secondary" onclick="useLEDPreset('busy')" style="flex: 1; min-width: 100px;">⏰ Busy</button>
+                        <button type="button" class="btn-secondary" onclick="useLEDPreset('special')" style="flex: 1; min-width: 100px;">⭐ Special</button>
+                    </div>
+                    <small class="form-hint">🚗 Driver Auto-Message shows what the driver app is currently sending</small>
+                </div>
+
+                <!-- Current Settings Info -->
+                <div style="background: #EFF6FF; border-left: 4px solid #3B82F6; padding: 15px; margin-top: 20px; border-radius: 4px;">
+                    <p style="margin: 0; font-size: 14px; color: #1E40AF;">
+                        <strong>ℹ️ How It Works:</strong><br>
+                        • Changes update instantly for all customers viewing the website<br>
+                        • LED sign appears on the main booking page<br>
+                        • Rainbow colors flow automatically across pixels<br>
+                        • Only admins can change these settings
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeLEDSignModal()">Cancel</button>
+                <button class="btn-secondary" onclick="clearAdminOverride()" style="background: #f59e0b; color: white;">🔓 Clear Override (Let Driver Control)</button>
+                <button class="btn-primary" onclick="updateLEDSignMessage()">🔒 Set Admin Override</button>
             </div>
         </div>
     </div>
@@ -811,8 +874,10 @@
         <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjGH0fPTgjMGHWu/7+OZSA0PVqzn77BdGAg+ltryxnMpBSh+zPLaizsIGGS57OihUBELTKXh8bllHAU2jdXzzn0vBSF1xe/glEILElyx6OyrWBUIQ5zd8sFuJAYuhM/z1YU2Bhxqvu7mnEoOD1ap5vCzYBoGPJPY88p2KwUme8rx3I4+CRZiturqpVITC0mi4PK8aB8GM4nU887+LgYif8vx2Ys5CBdnvO3om04MDlas5vC1YRsGO5DX8sh0LAUofsrx2448CRhhu+vrpVMSDEql4fK6aB4GMYfS89GAPggeb8Xu45ZECw9Zre3wt2IdCT+W2fHAdC0GKoHO89WHNwgZZ7vs6J9NEAxOpOLyt2QdBTeO1fPPgDEFFnLB79yMOwkWX7bp7KlUEgtLpOHxuWceBjSJ1PPOey4FIXnG79+RQQsQWK/m7rdmHQc9ldrxwHMpBSl/y/HYijcIF2a76+aiUBELTKLg8bxoHwYxh9Dzz34uBSBzw+7dlEMLEVeu5u+2Yx0IPpXX8L1xJwUofMrx1oY1Bhpnuerpo1ISC0qh4PG7aR4GMojT89CDMQUWccLu3pBBCw9XrubvtWMdBzyU2PHBcSYFJ3vJ8deLOQgYY7ro6qZTEgxKoeHzv2kfBjOIz/PQgC8FFm+/7tyPPwkPVq3m7rdjHQc9lNjwwG8nBSZ5yPHWiTgHGGK56OmkUhIMSZ/g8bpoIAY0iNDzzYEwBRVuwu7dlEALD1et5u+1Yx0HPJLa8L5vJwQne8jx1oo4CBdiu+bqpFQTDEqh4PO8aB8GM4nP8tB+MAUVb8Hu3I9ACg9Wrebut2MdBz2T2PCgcCcFJ3rI8deLOQgYYbrn6qNTEwxKn+DyvGgfBjKJ0PPOgS8EFnDB7t2SQAsOV63n77VjHQc8lNjwvnAnBCd7yPHWizkIF2K65+qkUxMMSqHg8rtoHwYziNDzzn8wBRZvwe7djkAJD1at5u62Yx0HPJPa8L5vJgQne8nx1oo5CBdiuebrpFQTC0mf4PK8aR8GM4jQ886AMAUWM=" type="audio/wav">
     </audio>
 
-    <script src="admin-app.js"></script>
+    <script src="led-matrix.js?v=20251112036"></script>
+    <script src="admin-app.js?v=20251112036"></script>
     <script src="admin-backup-functions.js"></script>
+    <!-- admin-led-functions.js REMOVED - LED functions now in admin-app.js with direction support -->
 </body>
 </html>
 

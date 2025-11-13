@@ -35,7 +35,11 @@ const {
   deleteCustomer,
   getDriverStatus,
   updateDriverStatus,
-  getActiveDriverRides
+  getActiveDriverRides,
+  getCurrentLEDMessage,
+  updateLEDMessage,
+  getLEDMessageHistory,
+  pool
 } = require('./database');
 const { initializeTwilio, sendConfirmationSMS, sendBusinessNotification, sendStatusUpdateSMS, sendDriverNotification } = require('./sms');
 const { getRouteAndPrice } = require('./maps');
@@ -84,6 +88,21 @@ app.get('/admin-app.js', (req, res) => {
 // Serve admin backup functions JS file
 app.get('/admin-backup-functions.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-backup-functions.js'));
+});
+
+// Serve admin LED functions JS file
+app.get('/admin-led-functions.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-led-functions.js'));
+});
+
+// Serve LED matrix JS file (for preview in admin)
+app.get('/led-matrix.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'led-matrix.js'));
+});
+
+// Serve admin LED controller JS file
+app.get('/admin-led-controller.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-led-controller.js'));
 });
 
 // Initialize Twilio
@@ -1179,6 +1198,85 @@ app.post('/api/driver/status', async (req, res) => {
     const { is_available, schedule_start, schedule_end, show_schedule } = req.body;
     const status = await updateDriverStatus({ is_available, schedule_start, schedule_end, show_schedule });
     
+    // Generate auto LED message from driver status
+    console.log('📋 Driver status update received:', { is_available, schedule_start, schedule_end, show_schedule });
+    
+    let autoMessage = '';
+    if (is_available) {
+      if (show_schedule && schedule_start && schedule_end) {
+        autoMessage = `DRIVER AVAILABLE ${schedule_start}-${schedule_end} - BOOK NOW ON THE APP`;
+        console.log('✅ Generated LED message (with schedule):', autoMessage);
+      } else {
+        autoMessage = 'DRIVER AVAILABLE NOW - BOOK NOW ON THE APP';
+        console.log('✅ Generated LED message (without schedule):', autoMessage);
+      }
+    } else {
+      autoMessage = 'DRIVER OFFLINE - CHECK BACK LATER';
+      console.log('✅ Generated LED message (offline):', autoMessage);
+    }
+    
+    // Check if admin has override
+    const currentLED = await getCurrentLEDMessage();
+    const isAdminOverride = currentLED && currentLED.is_admin_override;
+    console.log('🔍 Admin override check:', isAdminOverride ? 'YES - ignoring driver message' : 'NO - will use driver message');
+    
+    // Only update LED if NOT admin override
+    if (!isAdminOverride) {
+      try {
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          
+          // Deactivate all previous messages
+          await client.query('UPDATE led_sign_settings SET is_active = false');
+          
+          // Insert driver auto-message with ALL parameters
+          const result = await client.query(`
+            INSERT INTO led_sign_settings 
+            (message, scroll_mode, direction, scroll_speed, pause_duration, color_mode, is_active, is_admin_override, source)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING *
+          `, [autoMessage, 'horizontal', 'left', 0.1, 2000, 'rainbow', true, false, 'driver']);
+          
+          await client.query('COMMIT');
+          
+          console.log('✅ LED message saved:', {
+            message: autoMessage,
+            speed: 0.1,
+            direction: 'left',
+            pause: 2000
+          });
+          
+          // Broadcast LED update with SLOW speed
+          const ledBroadcast = {
+            text: autoMessage,
+            scrollMode: 'horizontal',
+            direction: 'left',
+            scrollSpeed: 0.1,
+            pauseDuration: 2000,
+            isAdminOverride: false,
+            source: 'driver',
+            timestamp: new Date().toISOString()
+          };
+          
+          console.log('📺 Broadcasting LED update:', ledBroadcast);
+          broadcastUpdate('led_sign_updated', ledBroadcast);
+          io.emit('led_sign_updated', ledBroadcast);
+        } catch (err) {
+          await client.query('ROLLBACK');
+          console.error('❌ Error updating driver LED message:', err);
+          throw err;
+        } finally {
+          client.release();
+        }
+      } catch (err) {
+        console.error('❌ Database error:', err);
+        // Don't throw - still return success for driver status update
+      }
+    } else {
+      console.log('⚠️ Driver status changed but admin has LED override - keeping admin message');
+    }
+    
     // Broadcast driver availability update to all connected clients
     broadcastUpdate('driver_status_updated', status);
     
@@ -1230,6 +1328,336 @@ app.post('/api/driver/complete-ride/:id', async (req, res) => {
   } catch (err) {
     console.error('Error completing ride:', err);
     res.status(500).json({ success: false, message: 'Error completing ride' });
+  }
+});
+
+// ===========================
+// LED SIGN CONTROL ROUTES
+// ===========================
+
+// Get current LED sign message (public - no auth required)
+app.get('/api/led-sign/current', async (req, res) => {
+  try {
+    const message = await getCurrentLEDMessage();
+    const defaultMessage = {
+      text: 'DRIVER AVAILABLE - BOOK NOW ON THE APP',
+      scrollMode: 'horizontal',
+      direction: 'left',
+      scrollSpeed: 0.1,
+      pauseDuration: 2000
+    };
+    
+    if (message) {
+      res.json({
+        success: true,
+        message: {
+          text: message.message,
+          scrollMode: message.scroll_mode,
+          direction: message.direction || 'left',
+          scrollSpeed: message.scroll_speed || 0.1,
+          pauseDuration: message.pause_duration || 2000,
+          isAdminOverride: message.is_admin_override || false,
+          source: message.source || 'driver'
+        }
+      });
+    } else {
+      res.json({ success: true, message: defaultMessage });
+    }
+  } catch (err) {
+    console.error('Error getting LED message:', err);
+    res.status(500).json({ success: false, message: 'Error getting LED message' });
+  }
+});
+
+// Update LED sign message (admin only)
+app.post('/api/led-sign/update', authenticateToken, async (req, res) => {
+  try {
+    const { text, scrollMode, scrollSpeed, isStatic } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message text is required'
+      });
+    }
+    
+    const actualScrollMode = isStatic ? 'static' : (scrollMode || 'horizontal');
+    const updatedMessage = await updateLEDMessage(text, actualScrollMode, 'rainbow', req.user.userId);
+    
+    // Log activity
+    await createActivityLog({
+      user_id: req.user.userId,
+      username: req.user.username,
+      action: 'update_led_sign',
+      details: `Updated LED message: "${text}"`,
+      ip_address: getUserIP(req)
+    });
+    
+    // Broadcast to all connected clients (customers will update their LED signs)
+    broadcastUpdate('led_sign_updated', {
+      text,
+      scrollMode: actualScrollMode,
+      scrollSpeed: scrollSpeed || 1,
+      isStatic: isStatic || false,
+      updatedBy: req.user.username
+    });
+    
+    res.json({
+      success: true,
+      message: 'LED sign updated successfully',
+      data: updatedMessage
+    });
+    
+  } catch (err) {
+    console.error('Error updating LED message:', err);
+    res.status(500).json({ success: false, message: 'Error updating LED message' });
+  }
+});
+
+// Get LED message history (admin only)
+app.get('/api/led-sign/history', authenticateToken, async (req, res) => {
+  try {
+    const history = await getLEDMessageHistory(50);
+    res.json({
+      success: true,
+      history
+    });
+  } catch (err) {
+    console.error('Error getting LED history:', err);
+    res.status(500).json({ success: false, message: 'Error getting LED history' });
+  }
+});
+
+// ===========================
+// LED SIGN ROUTES
+// ===========================
+
+// Update LED sign message (admin override)
+app.post('/api/led-sign/message', authenticateToken, async (req, res) => {
+  try {
+    const { text, scrollMode, scrollSpeed, pauseDuration, direction, updatedBy } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({ success: false, message: 'Message text is required' });
+    }
+    
+    const finalDirection = direction || 'left';
+    const finalSpeed = scrollSpeed !== undefined ? scrollSpeed : 0.3;
+    const finalPause = pauseDuration !== undefined ? pauseDuration : 3000;
+    
+    console.log('📥 LED update received from admin:', { text, scrollMode, finalDirection, finalSpeed, finalPause });
+    
+    // Save to database with all parameters
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Deactivate all previous messages
+      await client.query('UPDATE led_sign_settings SET is_active = false');
+      
+      // Insert new message with full parameters (ADMIN OVERRIDE)
+      const result = await client.query(`
+        INSERT INTO led_sign_settings 
+        (message, scroll_mode, direction, scroll_speed, pause_duration, color_mode, is_active, is_admin_override, source, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `, [text.toUpperCase(), scrollMode || 'horizontal', finalDirection, finalSpeed, finalPause, 'rainbow', true, true, 'admin', req.user.id]);
+      
+      await client.query('COMMIT');
+      console.log('✅ ADMIN OVERRIDE - LED message saved to database with direction:', finalDirection);
+      
+      // Broadcast to all connected clients with all settings
+      const broadcastData = {
+        text: text.toUpperCase(),
+        direction: finalDirection,
+        scrollMode: scrollMode || 'horizontal',
+        scrollSpeed: finalSpeed,
+        pauseDuration: finalPause,
+        isAdminOverride: true,
+        updatedBy: req.user.username,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('📡 Broadcasting LED update to all clients:', broadcastData);
+      broadcastUpdate('led_sign_updated', broadcastData);
+      io.emit('led_sign_updated', broadcastData);
+      
+      res.json({ success: true, message: result.rows[0], broadcast: broadcastData });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Error updating LED sign:', err);
+    res.status(500).json({ success: false, message: 'Error updating LED sign' });
+  }
+});
+
+// Update LED sign with multiple messages (new endpoint)
+app.post('/api/led-sign/messages', authenticateToken, async (req, res) => {
+  try {
+    const { messages, isAdminOverride, source, updatedBy } = req.body;
+    
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one message is required' });
+    }
+    
+    console.log(`📥 Received ${messages.length} LED messages from admin`);
+    messages.forEach((msg, idx) => {
+      console.log(`  ${idx + 1}. "${msg.text}" - ${msg.direction} @ ${msg.speed}x`);
+    });
+    
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Deactivate all previous messages
+      await client.query('UPDATE led_sign_settings SET is_active = false');
+      
+      // Insert each message with sequence order
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        await client.query(`
+          INSERT INTO led_sign_settings 
+          (message, scroll_mode, direction, scroll_speed, pause_duration, color_mode, text_color, bg_color, is_active, is_admin_override, source, created_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `, [msg.text, 'horizontal', msg.direction, msg.speed, msg.pause, 'solid', msg.textColor || '#00FF00', msg.bgColor || '#000000', true, true, 'admin', req.user.id]);
+        
+        console.log(`  ✅ Saved message ${i + 1} to database (colors: ${msg.textColor}, ${msg.bgColor})`);
+      }
+      
+      await client.query('COMMIT');
+      
+      // Broadcast message sequence to all clients
+      const broadcastData = {
+        messages: messages,
+        isAdminOverride: true,
+        messageCount: messages.length,
+        source: 'admin',
+        updatedBy: req.user.username,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log(`📡 Broadcasting ${messages.length} message sequence to all clients`);
+      broadcastUpdate('led_messages_updated', broadcastData);
+      io.emit('led_messages_updated', broadcastData);
+      
+      res.json({ success: true, messageCount: messages.length });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Error updating LED messages:', err);
+    res.status(500).json({ success: false, message: 'Error updating LED messages' });
+  }
+});
+
+// Clear admin override - allow driver auto-messages
+app.post('/api/led-sign/clear-override', authenticateToken, async (req, res) => {
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Deactivate all messages
+      await client.query('UPDATE led_sign_settings SET is_active = false');
+      
+      // Get current driver status to generate auto-message
+      const driverStatus = await getDriverStatus();
+      let autoMessage = '';
+      
+      if (driverStatus.is_available) {
+        if (driverStatus.show_schedule && driverStatus.schedule_start && driverStatus.schedule_end) {
+          autoMessage = `DRIVER AVAILABLE ${driverStatus.schedule_start}-${driverStatus.schedule_end} - BOOK NOW ON THE APP`;
+        } else {
+          autoMessage = 'DRIVER AVAILABLE NOW - BOOK NOW ON THE APP';
+        }
+      } else {
+        autoMessage = 'DRIVER OFFLINE - CHECK BACK LATER';
+      }
+      
+      // Insert driver auto-message (NO override) with SLOW speed (0.1x)
+      const result = await client.query(`
+        INSERT INTO led_sign_settings 
+        (message, scroll_mode, direction, scroll_speed, pause_duration, color_mode, is_active, is_admin_override, source)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *
+      `, [autoMessage, 'horizontal', 'left', 0.1, 2000, 'rainbow', true, false, 'driver']);
+      
+      console.log('✅ LED saved with speed:', result.rows[0].scroll_speed);
+      
+      await client.query('COMMIT');
+      
+      // Broadcast LED update with SLOW speed
+      const ledBroadcast = {
+        text: autoMessage,
+        scrollMode: 'horizontal',
+        direction: 'left',
+        scrollSpeed: 0.1,
+        pauseDuration: 2000,
+        isAdminOverride: false,
+        source: 'driver',
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('🔓 Admin override cleared - Reverting to driver message:', autoMessage);
+      broadcastUpdate('led_sign_updated', ledBroadcast);
+      io.emit('led_sign_updated', ledBroadcast);
+      
+      res.json({ success: true, message: 'Override cleared - driver now controls LED' });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('Error clearing override:', err);
+    res.status(500).json({ success: false, message: 'Error clearing override' });
+  }
+});
+
+// Get all active LED messages (for multi-message sequences)
+app.get('/api/led-sign/all-active', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM led_sign_settings 
+      WHERE is_active = true 
+      ORDER BY id ASC
+    `);
+    
+    res.json({
+      success: true,
+      messages: result.rows,
+      count: result.rows.length,
+      isAdminOverride: result.rows.length > 0 && result.rows[0].is_admin_override
+    });
+  } catch (err) {
+    console.error('Error getting active LED messages:', err);
+    res.status(500).json({ success: false, message: 'Error getting LED messages' });
+  }
+});
+
+// Diagnostic endpoint - check LED status
+app.get('/api/led-debug', async (req, res) => {
+  try {
+    const currentLED = await getCurrentLEDMessage();
+    const driverStatus = await getDriverStatus();
+    
+    res.json({
+      success: true,
+      currentLED: currentLED,
+      driverStatus: driverStatus,
+      isAdminOverride: currentLED ? currentLED.is_admin_override : false,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
